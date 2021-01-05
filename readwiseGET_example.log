@@ -1,0 +1,32 @@
+2020-12-29T12:35:26Z Script started
+2020-12-29T12:35:48Z 450 new books added and 0 updated in articles object
+2020-12-29T12:35:48Z 596 new books added and 0 updated in books object
+2020-12-29T12:35:48Z 55 new books added and 0 updated in podcasts object
+2020-12-29T12:35:48Z 134 new books added and 0 updated in supplementals object
+2020-12-29T12:35:48Z 86 new books added and 0 updated in tweets object
+2020-12-29T12:37:34Z 6230 new highlights added and 0 updated (excl tags)
+2020-12-29T12:37:35Z No missing highlights (incl tags) to update
+2020-12-29T12:37:35Z Fetching tags for 6230 highlights in bulk via CSV export...
+2020-12-29T12:37:58Z readwise-data.csv successfully added to C:/Users/johnsmith/Downloads/readwise2directory
+2020-12-29T12:38:14Z 6090/6230 highlights matched with 2870/2876 tags
+2020-12-29T12:38:20Z 2870/2870 tags added or updated from the CSV export
+2020-12-29T12:38:20Z 176 highlights discarded
+2020-12-29T12:38:24Z 763 new markdown notes created
+2020-12-29T12:38:24Z Script complete
+2020-12-30T12:37:02Z Script started
+2020-12-30T12:37:02Z Last successful script run = "2020-12-29T12:38:24Z" used as dateFrom in query string
+2020-12-30T12:37:03Z 450 books loaded from articles.json
+2020-12-30T12:37:03Z 596 books loaded from books.json
+2020-12-30T12:37:03Z 55 books loaded from podcasts.json
+2020-12-30T12:37:03Z 134 books loaded from supplementals.json
+2020-12-30T12:37:03Z 86 books loaded from tweets.json
+2020-12-30T12:37:03Z 0 new books added and 1 updated in articles object
+2020-12-30T12:37:03Z 0 new books added and 2 updated in podcasts object
+2020-12-30T12:37:04Z 0 new highlights added and 4 updated (excl tags)
+2020-12-30T12:37:05Z 3 highlights updated (incl tags) in articles object
+2020-12-30T12:37:05Z Fetching tags for 7 highlights individually...
+2020-12-30T12:37:26Z 0 tags added or updated to 4 highlights in podcasts object
+2020-12-30T12:37:46Z 0 tags added or updated to 3 highlights in articles object
+2020-12-30T12:37:46Z 0 highlights discarded
+2020-12-30T12:37:46Z 0 new markdown notes created
+2020-12-30T12:37:46Z Script complete
