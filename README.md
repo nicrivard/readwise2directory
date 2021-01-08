@@ -6,7 +6,7 @@ I'm a huge fan of [Readwise](https://readwise.io/) and [Obsidian](https://obsidi
 
 # Features
 
-- Fetch all or subset of new books and highlights from Readwise
+- Fetch all or subset of new books and highlights from Readwise (via their API https://readwise.io/api_deets)
 	- Filter by custom `date from` or `last script run` date
 - Group and sort highlights by book/article/podcast/tweet
 - Create new markdown notes or append to existing ones in a chosen directory (i.e. Obsidian vault)
