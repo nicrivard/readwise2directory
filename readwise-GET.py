@@ -10,7 +10,6 @@ from unidecode import unidecode
 from pathvalidate import ValidationError, validate_filepath
 from pathlib import Path
 from django.utils.text import slugify
-# from django.utils.text import get_valid_filename as get_valid_filename_django
 from json import JSONEncoder
 from json.decoder import JSONDecodeError
 import pandas as pd
@@ -183,7 +182,7 @@ def appendHighlightDataToObject():
                     categoriesObject[indexCategory][indexBook]['highlights'].append(highlight)
                     sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
                     newHighlightsCounter += 1
-                    listOfBookIdsToUpdateMarkdownNotes.append([key, source])
+                    listOfBookIdsToUpdateMarkdownNotes.append([str(key), str(source)])
                     print(str((newHighlightsCounter + updatedHighlightsCounter)) + '/' + str(len(highlightsListResultsSort)) + ' highlights added or updated')
                 else:
                     indexHighlight = list(map(itemgetter('id'), categoriesObject[indexCategory][indexBook]['highlights'])).index(id) # Should be the same as 'data'
@@ -192,7 +191,7 @@ def appendHighlightDataToObject():
                     categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight] = highlight
                     sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
                     updatedHighlightsCounter += 1
-                    listOfBookIdsToUpdateMarkdownNotes.append([key, source])
+                    listOfBookIdsToUpdateMarkdownNotes.append([str(key), str(source)])
                     print(str((newHighlightsCounter + updatedHighlightsCounter)) + '/' + str(len(highlightsListResultsSort)) + ' highlights added or updated')
     message = str(newHighlightsCounter) + ' new highlights added and ' + str(updatedHighlightsCounter) + ' updated (excl tags)' # '.json'
     logDateTimeOutput(message)
@@ -275,7 +274,7 @@ def appendTagsToHighlightObject(list_highlights):
                         categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['updated'] = bookLastUpdated
                         updatedTagsCounter += abs((newTagsCounter - originalTagsCounter))
                         newOrUpdatedTagsProgressCounter += 1
-                        listOfBookIdsToUpdateMarkdownNotes.append([key, source])
+                        listOfBookIdsToUpdateMarkdownNotes.append([str(key), str(source)])
                         print(str(newOrUpdatedTagsProgressCounter) + '/' + str(len(list_highlights)) + ' highlights updated with tags')
                 except: 
                     message = 'Error looping through tags in highlight id block "' + str(id) + '". Book id: "' + str(book_id) + '". Book URL: "' + str(bookReviewUrl) + '". File: "' \
@@ -396,7 +395,7 @@ def appendUpdatedHighlightsToObject():
                         categoriesObject[indexCategory][indexBook]['highlights'].append(highlight)
                         sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
                         newMissingHighlightsCounter += 1
-                        listOfBookIdsToUpdateMarkdownNotes.append([book_id, source])
+                        listOfBookIdsToUpdateMarkdownNotes.append([str(book_id), str(source)])
                         print(str((newMissingHighlightsCounter + updatedMissingHighlightsCounter)) + '/' + str(len(missingHighlightsListResultsSort)) + ' missing highlights added or updated')
                     else:
                         indexHighlight = list(map(itemgetter('id'), categoriesObject[indexCategory][indexBook]['highlights'])).index(id)
@@ -415,7 +414,7 @@ def appendUpdatedHighlightsToObject():
                                 categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['note'] = note
                         sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
                         updatedMissingHighlightsCounter += 1
-                        listOfBookIdsToUpdateMarkdownNotes.append([book_id, source])
+                        listOfBookIdsToUpdateMarkdownNotes.append([str(book_id), str(source)])
                     print(str((newMissingHighlightsCounter + updatedMissingHighlightsCounter)) + '/' + str(len(missingHighlightsListResultsSort)) + ' missing highlights added or updated in ' \
                         + str(categoriesObjectNames[indexCategory]) + ' object')
             except ValueError:
@@ -971,6 +970,18 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
                         else:
                             url = str(categoriesObject[indexCategory][indexBook]['highlights'][n]['url'])
                             highlightData.append("**References:** " + str(url) + "\n")
+                        if source == "podcasts" and str(url) != "None":
+                            # Append 'embed/' after the 'airr.io/' string and before the '/quote/' string
+                            airrQuoteMatchingPattern = 'airr.io/'
+                            airrQuoteEmbedText = 'embed/'
+                            if any(airrQuoteMatchingPattern in url for string in url): # Check if url is an AirrQuote
+                                i = url.find(airrQuoteMatchingPattern) # Find index of matching pattern
+                                podcastUrl = url[:i + len(airrQuoteMatchingPattern)] + airrQuoteEmbedText + url[i + len(airrQuoteMatchingPattern):]
+                            else:
+                                podcastUrl = url
+                            iFrameWithPodcastUrl = '<iframe src="' + podcastUrl + '" frameborder="0" style="width:100%; height:100%;"></iframe>'
+                            highlightData.append(iFrameWithPodcastUrl + "\n")
+                        """
                         highlighted_at = datetime.strptime(categoriesObject[indexCategory][indexBook]['highlights'][n]['highlighted_at'][0:10], '%Y-%m-%d').strftime("%y%m%d %A") # Trim the UTC date field and re-format
                         updated = datetime.strptime(categoriesObject[indexCategory][indexBook]['highlights'][n]['updated'][0:10], '%Y-%m-%d').strftime("%y%m%d %A") # Trim the UTC date field and re-format
                         if highlighted_at == updated:
@@ -979,6 +990,7 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
                         else:
                             date = highlighted_at
                             highlightData.append("**Date:** " + "[[" + str(date) + "]]" + "\n")
+                        """
                         highlightData.append("\n" + "---" + "\n")
                         highlightData = "".join(highlightData)
                         print(highlightData, file=newFile)
