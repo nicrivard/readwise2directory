@@ -584,18 +584,26 @@ def downloadCsvExport(originalDownloadsDirectory, newDownloadsDirectory, latestD
         driver.get('https://readwise.io/accounts/login')
         print('Logging into readwise using credentials provided in readwiseMetadata')
         # Input email as username from readwiseMetadata
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, "//*[@id='id_login']")))
         username = driver.find_element_by_xpath("//*[@id='id_login']")
         username.clear()
         username.send_keys(email) # from 'readwiseMetadata'
         # Input password from readwiseMetadata
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, "//*[@id='id_password']")))
         password = driver.find_element_by_xpath("//*[@id='id_password']")
         password.clear()
         password.send_keys(pwd) # from 'readwiseMetadata'
         # Click login button
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/div/div/div/div/div/form/div[3]/button")))
         driver.find_element_by_xpath("/html/body/div[1]/div/div/div/div/div/div/form/div[3]/button").click()
         print('Log-in successful! Redirecting to export page...')
         driver.get('https://readwise.io/export')
         # Click export CSV button
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, "//*[@id='MiscApp']/div/div[3]/div/div[1]/div/div[2]/div/button")))
         driver.find_element_by_xpath("//*[@id='MiscApp']/div/div[3]/div/div[1]/div/div[2]/div/button").click()
         print('Redirect successful! Waiting for CSV export...')
         waitForDownloadAndRename(newDownloadsDirectory, latestDownloadedFileName, driver)
