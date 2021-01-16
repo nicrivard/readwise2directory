@@ -445,6 +445,8 @@ def replaceNoneInListOfDict(listOfDicts):
                 listOfDicts[i][k] = 0
             if k == 'location_type' and v == 'none':
                 listOfDicts[i][k] = 'custom'
+            if k == 'highlighted_at' and v is None:
+                listOfDicts[i][k] = str(v)
 
 def removeHighlightsWithDiscardTag():
     listCategories = list(categoriesObject)
