@@ -510,11 +510,13 @@ def appendHashtagToTags():
 # If any of the optional input variables in readwiseMetadata are blank or missing, set boolean to False
 fetchTagsBoolean = True
 
-def fetchTagsTrueOrFalse(inputVariable):
-    if inputVariable == "" or inputVariable is None:
-        fetchTagsBoolean = False
+def fetchTagsTrueOrFalse(fetchTagsBoolean, inputVariable):
+    if fetchTagsBoolean is False:
+        return False
+    elif inputVariable == "" or inputVariable is None:
+        return False
     else:
-        return
+        return True
 
 ################################################
 ### Load CSV export into dataframe and lists ###
@@ -1004,6 +1006,7 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
                         highlightData.append("\n" + "---" + "\n")
                         highlightData = "".join(highlightData)
                         print(highlightData, file=newFile)
+                print(str(title) + ' created or updated')
     os.chdir(sourceDirectory) # Revert to original directory with script
     if str(booksWithHeadings) == '0':
         pass
@@ -1057,11 +1060,11 @@ print(str(sourceDirectory) + ' directory variable defined')
 
 # Function to check if any of the optional input variables in readwiseMetadata are blank or missing
 # If blank or missing, set boolean value to False and no tags will be fetched
-fetchTagsTrueOrFalse(email)
-fetchTagsTrueOrFalse(pwd)
-fetchTagsTrueOrFalse(chromedriverDirectory)
-fetchTagsTrueOrFalse(highlightLimitToFetchTags)
-fetchTagsTrueOrFalse(downloadsDirectory)
+fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, email)
+fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, pwd)
+fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, chromedriverDirectory)
+fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, highlightLimitToFetchTags)
+fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, downloadsDirectory)
 
 ######################################
 ### Load book data from JSON files ###
