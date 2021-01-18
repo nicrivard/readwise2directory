@@ -45,6 +45,9 @@ I'm a huge fan of [Readwise](https://readwise.io/) and [Obsidian](https://obsidi
 ##### Markdown note with book metadata as YAML frontmatter
 ![](Assets/readwise-python_1.png)
 
+##### Cover images with hyperlinks to their source URLs in Readwise
+![](Assets/readwise-python_6.png)
+
 ##### Highlight data with Readwise highlight ID's as unique block references 
 ![](Assets/readwise-python_2.png)
 
@@ -66,7 +69,7 @@ I'm a huge fan of [Readwise](https://readwise.io/) and [Obsidian](https://obsidi
 		- Add your token - https://readwise.io/access_token
 		- Specify a valid `targetDirectory` path for your markdown notes (e.g. Dropbox folder, Obsidian Vault).
 	- Optional
-		- Customise the request query string - add a `dateFrom` (formatted as "YYYY-MM-DD"), otherwise the 'last script run' will be used (if available) or all highlights will be fetched
+		- Customise the request query string - add a `dateFrom` (formatted as "YYYY-MM-DD"), otherwise the `last script run` will be used (if available) or all highlights will be fetched
 		- Add your `email` and `password`
 		- Specify a `chromedriverDirectory` - instructions [here](https://chromedriver.chromium.org/)
 		- Update the `highlightLimitToFetchTags` - default is 10 (recommended)
