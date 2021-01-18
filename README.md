@@ -81,4 +81,4 @@ I'm a huge fan of [Readwise](https://readwise.io/) and [Obsidian](https://obsidi
 
 If you like this plugin, please consider donating; I really appreciate any and all support! 
 
-[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/paypal.me/nicrivard)
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/paypalme/nicrivard)
