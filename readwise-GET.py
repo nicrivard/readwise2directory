@@ -131,8 +131,9 @@ def appendBookDataToObject():
             source = data['category']
             num_highlights = data['num_highlights']
             updated = data['updated']
+            cover_image_url = data['cover_image_url']
             highlights = []
-            values = { "book_id" : book_id, "title" : title, "author" : author, "source" : source, "url" : url, "num_highlights" : num_highlights, "updated" : updated, "highlights" : highlights }
+            values = { "book_id" : book_id, "title" : title, "author" : author, "source" : source, "url" : url, "num_highlights" : num_highlights, "updated" : updated, "cover_image_url" : cover_image_url, "highlights" : highlights }
             indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
             if not any(d["book_id"] == book_id for d in categoriesObject[indexCategory]):
                 categoriesObject[indexCategory].append(values)
@@ -147,6 +148,7 @@ def appendBookDataToObject():
                 categoriesObject[indexCategory][indexBook]['url'] = url
                 categoriesObject[indexCategory][indexBook]['num_highlights'] = num_highlights
                 categoriesObject[indexCategory][indexBook]['updated'] = updated
+                categoriesObject[indexCategory][indexBook]['cover_image_url'] = cover_image_url
                 updatedBooksCounter += 1
                 print(str((newBooksCounter + updatedBooksCounter)) + '/' + str(len(booksListResultsSort)) + ' books added or updated')
         new_newBooksCounter = newBooksCounter
@@ -912,6 +914,13 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
             yamlData.append("---" + "\n\n")
             yamlData.append("# " + str(title) + "\n\n")
             yamlData.append("---" + "\n")
+            # Add cover image URL if exists
+            try:
+                cover_image_url = str(categoriesObject[indexCategory][indexBook]['cover_image_url'])
+                yamlData.append("\n" + "[![](" + cover_image_url + ")](" + url + ")" + "\n\n")
+                yamlData.append("---" + "\n")
+            except NameError:
+                continue 
             fileName = slugify(title)
             # fileName = get_valid_filename_django(title)
             yamlData = "".join(yamlData)
@@ -1006,7 +1015,7 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
                         highlightData.append("\n" + "---" + "\n")
                         highlightData = "".join(highlightData)
                         print(highlightData, file=newFile)
-                print(str(title) + ' created or updated')
+                print(' - "' + str(title) + '"')
     os.chdir(sourceDirectory) # Revert to original directory with script
     if str(booksWithHeadings) == '0':
         pass
@@ -1332,6 +1341,8 @@ appendBookAndHighlightObjectToJson()
 ############################
 
 newMarkdownNoteAmount = numberOfMarkdownNotes() # Sum the new number of books in each dictionary
+
+print('Creating or updating markdown notes...')
 
 createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes)
 
