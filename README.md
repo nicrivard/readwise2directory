@@ -1,3 +1,12 @@
+# Contributions
+
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/paypalme/nicrivard) 
+
+If you like this plugin, please consider donating; I really appreciate any and all support! ❤️
+
+---
+
+
 # Description
 
 Fetch new books and highlights from Readwise and print the results as markdown files in a chosen directory (i.e. Obsidian vault)
@@ -76,9 +85,3 @@ I'm a huge fan of [Readwise](https://readwise.io/) and [Obsidian](https://obsidi
 # Requirements
 - A Readwise account and a valid access token (https://readwise.io/access_token)
 - Python 3.9.0+ (https://www.python.org/downloads/). 
-
-# Donations
-
-If you like this plugin, please consider donating; I really appreciate any and all support! 
-
-[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/paypalme/nicrivard)
