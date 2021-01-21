@@ -11,8 +11,7 @@ token = "" # ENTER YOUR TOKEN HERE
 ########################################################### 
 
 targetDirectory = "" # ENTER VALID DIRECTORY PATH HERE
-# Make sure you leave a closing slash! 
-# e.g. "/Users/johnsmith/Dropbox/Obsidian/Vault/" on Mac or "\\Users\\johnsmith\\Dropbox\\Obsidian\\Vault\\" on Windows
+# e.g. "/Users/johnsmith/Dropbox/Obsidian/Vault" on Mac or "\\Users\\johnsmith\\Dropbox\\Obsidian\\Vault" on Windows
 
 ##################################################
 ### Specify query string parameters (optional) ###
@@ -45,4 +44,4 @@ highlightLimitToFetchTags = 10 # ENTER NUMBER HERE
 # If <=10 highlights returned, fetch tags individually. If >10 highlights returned, fetch tags in bulk via a CSV export
 
 downloadsDirectory = "" # ENTER VALID DIRECTORY PATH HERE
-# e.g. "/Users/johnsmith/Downloads/" on Mac or "\\Users\\johnsmith\\Downloads\\" on Windows
+# e.g. "/Users/johnsmith/Downloads" on Mac or "\\Users\\johnsmith\\Downloads" on Windows
