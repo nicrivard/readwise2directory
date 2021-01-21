@@ -127,13 +127,14 @@ def appendBookDataToObject():
                 author = " "
             else: 
                 author = unidecode(data['author'])
-            url = data['highlights_url']
             source = data['category']
             num_highlights = data['num_highlights']
             updated = data['updated']
             cover_image_url = data['cover_image_url']
+            url = data['highlights_url']
+            source_url = data['source_url']
             highlights = []
-            values = { "book_id" : book_id, "title" : title, "author" : author, "source" : source, "url" : url, "num_highlights" : num_highlights, "updated" : updated, "cover_image_url" : cover_image_url, "highlights" : highlights }
+            values = { "book_id" : book_id, "title" : title, "author" : author, "source" : source, "url" : url, "cover_image_url" : cover_image_url, "source_url" : source_url, "num_highlights" : num_highlights, "updated" : updated, "highlights" : highlights }
             indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
             if not any(d["book_id"] == book_id for d in categoriesObject[indexCategory]):
                 categoriesObject[indexCategory].append(values)
@@ -145,10 +146,11 @@ def appendBookDataToObject():
                 categoriesObject[indexCategory][indexBook]['title'] = title  
                 categoriesObject[indexCategory][indexBook]['author'] = author
                 categoriesObject[indexCategory][indexBook]['source'] = source
-                categoriesObject[indexCategory][indexBook]['url'] = url
                 categoriesObject[indexCategory][indexBook]['num_highlights'] = num_highlights
                 categoriesObject[indexCategory][indexBook]['updated'] = updated
                 categoriesObject[indexCategory][indexBook]['cover_image_url'] = cover_image_url
+                categoriesObject[indexCategory][indexBook]['url'] = url
+                categoriesObject[indexCategory][indexBook]['source_url'] = source_url
                 updatedBooksCounter += 1
                 print(str((newBooksCounter + updatedBooksCounter)) + '/' + str(len(booksListResultsSort)) + ' books added or updated')
         new_newBooksCounter = newBooksCounter
@@ -892,9 +894,12 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
             indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
             indexBook = list(map(itemgetter('book_id'), categoriesObject[indexCategory])).index(str(key)) # Identify which position the 'book_id' corresponds to within the category object
             yamlData = []
+            titleBlock = []
             yamlData.append("---" + "\n")
+            # Add title to yamlData and titleBlock
             title = unidecode(categoriesObject[indexCategory][indexBook]['title']).replace('"', '\'')
             yamlData.append("Title: " + "\"" + str(title) + "\"" + "\n")
+            titleBlock.append("# " + str(title) + "\n")
             if(str(categoriesObject[indexCategory][indexBook]['author']) == "None"):
                 author = " "
                 yamlData.append("Author: " + str(author) + "\n")
@@ -907,23 +912,35 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
             yamlData.append("Highlights: " + str(num_highlights) + "\n")
             lastUpdated = datetime.strptime(categoriesObject[indexCategory][indexBook]['updated'][0:10], '%Y-%m-%d').strftime("%y%m%d %A")
             yamlData.append("Updated: " + "[[" + str(lastUpdated) + "]]" + "\n")
-            url = categoriesObject[indexCategory][indexBook]['url']
+            # Add readwise url to yamlData and titleBlock
+            url = str(categoriesObject[indexCategory][indexBook]['url'])
             yamlData.append("Readwise URL: " + str(url) + "\n")
+            titleBlock.append("[Readwise URL](" + str(url) + ")")
             book_id = str(categoriesObject[indexCategory][indexBook]['book_id'])
             yamlData.append("Readwise ID: " + str(book_id) + "\n")
+            # Add source URL (if exists) to yamlData and titleBlock
+            try: 
+                source_url = str(categoriesObject[indexCategory][indexBook]['source_url'])
+                if source_url.lower() == "none" or source_url.lower() == "null" or source_url == "":
+                    continue
+                else:
+                    yamlData.append("Source URL: " + str(source_url) + "\n")
+                    titleBlock.append(" | " + "[Source URL](" + str(source_url) + ")"+ "\n\n")
+            except NameError:
+                continue
             yamlData.append("---" + "\n\n")
-            yamlData.append("# " + str(title) + "\n\n")
-            yamlData.append("---" + "\n")
+            titleBlock.append("---" + "\n\n")
             # Add cover image URL if exists
             try:
                 cover_image_url = str(categoriesObject[indexCategory][indexBook]['cover_image_url'])
-                yamlData.append("\n" + "[![](" + cover_image_url + ")](" + url + ")" + "\n\n")
-                yamlData.append("---" + "\n")
+                titleBlock.append("![](" + cover_image_url + ")" + "\n\n")
+                titleBlock.append("---" + "\n")
             except NameError:
                 continue 
             fileName = slugify(title)
             # fileName = get_valid_filename_django(title)
             yamlData = "".join(yamlData)
+            titleBlock = "".join(titleBlock)
             # Ignore books with no highlights
             if str(num_highlights) == '0':
                 booksWithNoHighlights += 1
@@ -931,6 +948,7 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
             else:
                 with open(fileName + ".md", 'w') as newFile: # Warning: this will overwrite all content within the readwise note. 
                     print(yamlData, file=newFile)
+                    print(titleBlock, file=newFile)
                     # Append highlights to the file beneath the 'book_id' metadata
                     for n in range(len(categoriesObject[indexCategory][indexBook]['highlights'])): 
                         highlightData = []
