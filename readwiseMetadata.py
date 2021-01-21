@@ -12,7 +12,7 @@ token = "" # ENTER YOUR TOKEN HERE
 
 targetDirectory = "" # ENTER VALID DIRECTORY PATH HERE
 # Make sure you leave a closing slash! 
-# e.g. "/Users/johnsmith/Dropbox/Obsidian/Vault/"
+# e.g. "/Users/johnsmith/Dropbox/Obsidian/Vault/" on Mac or "\\Users\\johnsmith\\Dropbox\\Obsidian\\Vault\\" on Windows
 
 ##################################################
 ### Specify query string parameters (optional) ###
@@ -37,7 +37,7 @@ pwd = "" # ENTER YOUR PASSWORD HERE
 # e.g. "J0HNSM1TH_312"
 
 chromedriverDirectory = "" # ENTER VALID PATH TO CHROMEDRIVER 
-# e.g. "/Users/johnsmith/Downloads/chromedriver.exe"
+# e.g. "/Users/johnsmith/Downloads/chromedriver.exe" on Mac or "\\Users\\johnsmith\\Downloads\\chromedriver.exe" on Windows
 # Read more here https://chromedriver.chromium.org/
 
 highlightLimitToFetchTags = 10 # ENTER NUMBER HERE 
@@ -45,4 +45,4 @@ highlightLimitToFetchTags = 10 # ENTER NUMBER HERE
 # If <=10 highlights returned, fetch tags individually. If >10 highlights returned, fetch tags in bulk via a CSV export
 
 downloadsDirectory = "" # ENTER VALID DIRECTORY PATH HERE
-# e.g. "/Users/johnsmith/Downloads/"
+# e.g. "/Users/johnsmith/Downloads/" on Mac or "\\Users\\johnsmith\\Downloads\\" on Windows
