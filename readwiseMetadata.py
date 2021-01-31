@@ -42,6 +42,3 @@ chromedriverDirectory = "" # ENTER VALID PATH TO CHROMEDRIVER
 highlightLimitToFetchTags = 10 # ENTER NUMBER HERE 
 # Specify an integer limit (I recommend 10 for speed) to determine whether to fetch tags individually or in bulk via CSV export
 # If <=10 highlights returned, fetch tags individually. If >10 highlights returned, fetch tags in bulk via a CSV export
-
-downloadsDirectory = "" # ENTER VALID DIRECTORY PATH HERE
-# e.g. "/Users/johnsmith/Downloads" on Mac or "\\Users\\johnsmith\\Downloads" on Windows
