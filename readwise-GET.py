@@ -16,8 +16,10 @@ import pandas as pd
 import numpy as np
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 ##########################
@@ -526,69 +528,57 @@ def fetchTagsTrueOrFalse(fetchTagsBoolean, inputVariable):
 ### Load CSV export into dataframe and lists ###
 ################################################
 
-def waitForDownloadAndRename(sourceDirectoryPath, latestDownloadedFileName, driver): # Originally from https://stackoverflow.com/a/61544031/14351071
-    # function to wait for all chrome downloads to finish
-    def chrome_downloads(driver):
-        if not "chrome://downloads" in driver.current_url: # if 'chrome downloads' is not current tab
-            print('Opening a new tab and redirecting to chrome://downloads...')
-            driver.execute_script("window.open()")
-            driver.switch_to.window(driver.window_handles[-1]) # switch to the new tab
-            driver.get("chrome://downloads") # navigate to chrome downloads 
-        return driver.execute_script("return document.querySelector('downloads-manager').shadowRoot.querySelector('#downloadsList').items.filter(e => e.state === 'COMPLETE').map(e => e.filePath || e.file_path || e.fileUrl || e.file_url)")
-        # return driver.execute_script("return document.querySelector('downloads-manager').shadowRoot.querySelector('#downloadsList downloads-item').shadowRoot.querySelector('div#content  #file-link').text")
-    print('Waiting for download to complete... ')
-    # wait for all the downloads to be completed
-    dld_file_paths = WebDriverWait(driver, 60, 1).until(chrome_downloads) # returns list of downloaded file paths
-    print('Download complete! Fetching filename from the last download...')
-    # get latest downloaded file name and path
-    dlFilename = dld_file_paths[0] # latest downloaded file from the list
-    # wait till downloaded file appears in download directory
-    time_to_wait = 20 # adjust timeout as per your needs
-    time_counter = 0
-    while not os.path.isfile(dlFilename):
+def latest_download_file():
+      path = sourceDirectory
+      files = sorted(os.listdir(os.getcwd()), key=os.path.getmtime)
+      newest = files[-1]
+      return newest
+
+def download_wait():
+    seconds = 0
+    dl_wait = True
+    while dl_wait and seconds < 20:
         time.sleep(1)
-        time_counter += 1
-        if time_counter > time_to_wait:
-            message = 'Error fetching last downloaded file and moving to downloads directory specified in readwiseMetadata'
-            logDateTimeOutput(message)
-            print(message)
-            driver.quit()
-            break
-    # rename the downloaded file
-    shutil.move(dlFilename, os.path.join(sourceDirectoryPath, latestDownloadedFileName))
-    message = str(latestDownloadedFileName) + ' successfully added to ' + str(sourceDirectoryPath)
-    logDateTimeOutput(message)
-    print(message)
-    return
+        dl_wait = False
+        for fname in os.listdir(sourceDirectory):
+            if fname.endswith('.crdownload'):
+                dl_wait = True
+        seconds += 1
+    newest_file = latest_download_file()
+    return newest_file
+
+####### V2.0 #######
 
 # Use Selenium to export CSV extract of highlight data, and save in sourceDirectory
-def downloadCsvExport(originalDownloadsDirectory, newDownloadsDirectory, latestDownloadedFileName):
+def downloadCsvExport(latestDownloadedFileName): # with_ublock=False, chromedriverDirectory=None
     if fetchTagsBoolean is False:
         return
     else:
         # Open new Chrome window via Selenium
         print('Opening new Chrome browser window...')
         options = webdriver.ChromeOptions()
+        options.add_argument("--headless")
+        options.add_argument("window-size=1920,1080")
+        options.add_argument("--log-level=3") # to stop logging
+        options.add_argument("--silent")
+        options.add_argument("--disable-logging")
+        options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_experimental_option('prefs', {
-        "download.default_directory": originalDownloadsDirectory, # Set own Download path
+        # "download.default_directory": downloadsDirectory, # Set own Download path
         "download.prompt_for_download": False, # Do not ask for download at runtime
         "download.directory_upgrade": True, # Also needed to suppress download prompt
+        "w3c": False, # allows selenium to accept cookies with a non-int64 'expiry' value
+        "excludeSwitches": ["enable-logging"], # removes the 'DevTools listening' log message
+        "excludeSwitches": ["enable-automation"], # prevent Cloudflare from detecting ChromeDriver as bot
         "useAutomationExtension": False,
         })
-        # options.set_headless(True)
-        options.add_argument('--ignore-certificate-errors')
-        options.add_argument('--incognito')
-        # options.add_argument('--headless')
-        options.add_argument('--log-level=3') # to stop logging
-        options.add_argument('start-maximized')
-        options.add_argument('--no-sandbox')
-        # options.add_argument('--window-size=1920,1080')
-        # options.add_argument('--disable-gpu')
-        # options.add_argument('--disable-extensions')
-        # options.add_argument('--proxy-server="direct://"')
-        # options.add_argument('--proxy-bypass-list=*')
-        driver = webdriver.Chrome(chromedriverDirectory, options=options)
-        # driver = webdriver.Chrome(chromedriverDirectory)
+        driver = webdriver.Chrome(
+            executable_path=chromedriverDirectory,
+            options=options,
+        )
+        driver.command_executor._commands["send_command"] = ("POST", '/session/$sessionId/chromium/send_command')
+        params = {'behavior': 'allow', 'downloadPath': sourceDirectory}
+        driver.execute_cdp_cmd('Page.setDownloadBehavior', params)
         driver.get('https://readwise.io/accounts/login')
         print('Logging into readwise using credentials provided in readwiseMetadata')
         # Input email as username from readwiseMetadata
@@ -614,8 +604,12 @@ def downloadCsvExport(originalDownloadsDirectory, newDownloadsDirectory, latestD
             EC.presence_of_element_located((By.XPATH, "//*[@id='MiscApp']/div/div[3]/div/div[1]/div/div[2]/div/button")))
         driver.find_element_by_xpath("//*[@id='MiscApp']/div/div[3]/div/div[1]/div/div[2]/div/button").click()
         print('Redirect successful! Waiting for CSV export...')
-        waitForDownloadAndRename(newDownloadsDirectory, latestDownloadedFileName, driver)
-        # downloadedFileName = chrome_downloads(driver) # Just to retrieve the file name of the last download
+        dlFilename = download_wait()
+        # rename the downloaded file
+        shutil.move(dlFilename, os.path.join(sourceDirectory, latestDownloadedFileName))
+        message = str(latestDownloadedFileName) + ' successfully added to ' + str(sourceDirectory)
+        logDateTimeOutput(message)
+        print(message)
         print('Closing Chrome browser window...')
         driver.quit()
 
@@ -801,7 +795,7 @@ def appendTagsFromCsvToCategoriesObject(list_highlights, list_ExtractedTags):
 
 def runFetchCsvData():
     readwiseCsvExportFileName = 'readwise-data.csv'
-    downloadCsvExport(downloadsDirectory, sourceDirectory, readwiseCsvExportFileName)
+    downloadCsvExport(readwiseCsvExportFileName)
     readwiseCsvExportPath = os.path.join(sourceDirectory, readwiseCsvExportFileName)
     df = pd.read_csv(readwiseCsvExportPath)
     # Insert complete path to the excel file and optional variables 
@@ -1066,7 +1060,7 @@ def numberOfMarkdownNotes():
 
 # Import all variables from readwiseMetadata file
 print('Importing variables from readwiseMetadata...')
-from readwiseMetadata import token, targetDirectory, dateFrom, email, pwd, chromedriverDirectory, highlightLimitToFetchTags, downloadsDirectory
+from readwiseMetadata import token, targetDirectory, dateFrom, email, pwd, chromedriverDirectory, highlightLimitToFetchTags
 # from readwiseMetadata import *
 
 # Check dateFrom variable
@@ -1091,7 +1085,6 @@ fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, email)
 fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, pwd)
 fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, chromedriverDirectory)
 fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, highlightLimitToFetchTags)
-fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, downloadsDirectory)
 
 ######################################
 ### Load book data from JSON files ###
