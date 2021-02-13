@@ -28,9 +28,9 @@ splitCategoriesIntoFolders = False # This will split highlights into separate fo
 
 includeCoverImage_note = True # This will add a "cover image" (if exists) below the title 
 
-includeDateAsComment_note = True # This will add the note "last updated" field below the title in "%%" block
+includeLastUpdated_note = True # This will add the note "last updated" field below the title in Obsidian "%%" comment block
 
-includeDateAsComment_highlight = False # This will add the highlight "last updated" field below the highlight in "%%" block
+includeLastUpdated_highlight = False # This will add the highlight "last updated" field below the highlight in Obsidian "%%" comment block
 
 includeiFrameForPodcast_highlight = True # This will add an iFrame with the "podcast url" below the highlight
 
