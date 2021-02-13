@@ -4,6 +4,7 @@
 
 import requests, os, io, sys, shutil, django, json, time
 from datetime import datetime
+from dateutil.parser import parse
 from itertools import groupby 
 from operator import itemgetter 
 from unidecode import unidecode
@@ -33,7 +34,7 @@ old_cwd = os.getcwd()
 startTime = datetime.now()
 
 def logDateTimeOutput(message):
-    log_file = open('readwiseGET.log', 'a')
+    log_file = open('readwise-directory.log', 'a')
     sys.stdout = log_file
     now = datetime.now()
     print(now.strftime("%Y-%m-%dT%H:%M:%SZ") + " " + str(message))
@@ -63,7 +64,7 @@ def convertDateFromToUtcFormat(dateFrom):
     if dateFrom == "" or dateFrom is None:
         lastScriptRunDateMatchingString = ' Script complete'
         try: 
-            for line in reversed(list(open('readwiseGET.log', 'r').readlines())):
+            for line in reversed(list(open('readwise-directory.log', 'r').readlines())):
                 if lastScriptRunDateMatchingString in line:
                     dateLastScriptRun = str(line.replace(lastScriptRunDateMatchingString, '')).rstrip("\n")
                     dateFrom = dateLastScriptRun
@@ -72,9 +73,10 @@ def convertDateFromToUtcFormat(dateFrom):
                     print(message)
                     return dateLastScriptRun
         except IOError:
-            logDateTimeOutput('Failed to read readwiseGET.log file')
+            logDateTimeOutput('Failed to read readwise-directory.log file')
     elif dateFrom != "" or dateFrom is not None:
         try:
+            parse(dateFrom, fuzzy = False)
             dateFrom = datetime.strptime(dateFrom, '%Y-%m-%d')
             dateFrom = dateFrom.strftime("%Y-%m-%dT%H:%M:%SZ")
             message = 'Date from = "' + str(dateFrom) + '" from readwiseMetadata used in query string'
@@ -82,9 +84,9 @@ def convertDateFromToUtcFormat(dateFrom):
             print(message)
             return dateFrom
         except ValueError:
-            logDateTimeOutput("Incorrect data format. It should be 'YYYY-MM-DD'")
+            logDateTimeOutput("Incorrect date format. It should be '%Y-%m-%d' a.k.a 'YYYY-MM-DD'")
     else:
-        message = 'No dateFrom variable defined in readwiseMetadata or readwiseGET.log. Fetching all readwise highlights'
+        message = 'No dateFrom variable defined in readwiseMetadata or readwise-directory.log. Fetching all readwise highlights'
         logDateTimeOutput(message)
         print(message)
 
@@ -182,6 +184,13 @@ def appendHighlightDataToObject():
                 updated = str(data['updated'])
                 text = unidecode(data['text'])
                 tags = []
+                # If the source is a book, add 10 hours to the highlighted at date to account for timezone difference between me and AKST (Amazon's highlighted at timezone)
+                # if (str(source) == 'books'):
+                #     highlighted_at = str(data['highlighted_at']) # 2021-02-06T04:56:00Z
+                #     highlighted_at = datetime.datetime.strptime(highlighted_at, "%Y-%m-%dT%H:%M:%SZ")
+                #     highlighted_at = highlighted_at + datetime.timedelta(hours=10)
+                #     highlighted_at = highlighted_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+                #     print(' appendHighlightDataToObject highlighted_at =', highlighted_at)
                 # highlight = { "id" : id, "text" : text, "note" : note, "tags" : tags, "location" : location, "location_type" : location_type, "url" : url, "highlighted_at" : highlighted_at, "updated" : updated }
                 if not any(d["id"] == id for d in categoriesObject[indexCategory][indexBook]['highlights']):
                     highlight = { "id" : id, "text" : text, "note" : note, "tags" : tags, "location" : location, "location_type" : location_type, "url" : url, "highlighted_at" : highlighted_at, "updated" : updated }
@@ -523,6 +532,26 @@ def fetchTagsTrueOrFalse(fetchTagsBoolean, inputVariable):
         return False
     else:
         return True
+
+def metadataBooleanCheck(booleanField, default):
+    if booleanField == "" or booleanField is None:
+        return default
+    else: 
+        return booleanField
+
+def metadataDateFormatCheck(inputVariable, default):
+    if inputVariable == "" or inputVariable is None:
+        return default
+    else: 
+        try:
+            today = datetime.today().strftime(inputVariable) # Check format is valid when applied to today's date field
+            parse(today, fuzzy = False)
+            return inputVariable
+        except ValueError:
+            message = "Incorrect date format. Default format will be used = '%Y-%m-%d' a.k.a 'YYYY-MM-DD'"
+            # logDateTimeOutput(message)
+            print(message)
+            return default
 
 ################################################
 ### Load CSV export into dataframe and lists ###
@@ -889,9 +918,11 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
             indexBook = list(map(itemgetter('book_id'), categoriesObject[indexCategory])).index(str(key)) # Identify which position the 'book_id' corresponds to within the category object
             yamlData = []
             titleBlock = []
+            commentBlock = []
             yamlData.append("---" + "\n")
             # Add title to yamlData and titleBlock
             title = unidecode(categoriesObject[indexCategory][indexBook]['title']).replace('"', '\'')
+            title = title.replace('\n', ' ')
             yamlData.append("Title: " + "\"" + str(title) + "\"" + "\n")
             titleBlock.append("# " + str(title) + "\n")
             if(str(categoriesObject[indexCategory][indexBook]['author']) == "None"):
@@ -899,13 +930,14 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
                 yamlData.append("Author: " + str(author) + "\n")
             else: 
                 author = unidecode(categoriesObject[indexCategory][indexBook]['author']).replace('"', '\'')
+                author = author.replace('\n', ' ')
                 yamlData.append("Author: " + "\"" + str(author) + "\"" + "\n")
             source = categoriesObject[indexCategory][indexBook]['source']
             yamlData.append("Tags: " + "[" + "readwise" + ", " + str(source) + "]" + "\n")
             num_highlights = categoriesObject[indexCategory][indexBook]['num_highlights']
             yamlData.append("Highlights: " + str(num_highlights) + "\n")
-            lastUpdated = datetime.strptime(categoriesObject[indexCategory][indexBook]['updated'][0:10], '%Y-%m-%d').strftime("%y%m%d %A")
-            yamlData.append("Updated: " + "[[" + str(lastUpdated) + "]]" + "\n")
+            lastUpdated = datetime.strptime(categoriesObject[indexCategory][indexBook]['updated'][0:10], '%Y-%m-%d').strftime(dateFormat)
+            yamlData.append("Last Updated: " + "[[" + str(lastUpdated) + "]]" + "\n")
             # Add readwise url to yamlData and titleBlock
             url = str(categoriesObject[indexCategory][indexBook]['url'])
             yamlData.append("Readwise URL: " + str(url) + "\n")
@@ -916,32 +948,70 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
             try: 
                 source_url = str(categoriesObject[indexCategory][indexBook]['source_url'])
                 if source_url.lower() == "none" or source_url.lower() == "null" or source_url == "":
-                    continue
+                    titleBlock.append("\n\n")
                 else:
                     yamlData.append("Source URL: " + str(source_url) + "\n")
                     titleBlock.append(" | " + "[Source URL](" + str(source_url) + ")"+ "\n\n")
             except NameError:
                 continue
-            yamlData.append("---" + "\n\n")
-            titleBlock.append("---" + "\n\n")
             # Add cover image URL if exists
-            try:
-                cover_image_url = str(categoriesObject[indexCategory][indexBook]['cover_image_url'])
-                titleBlock.append("![](" + cover_image_url + ")" + "\n\n")
-                titleBlock.append("---" + "\n")
-            except NameError:
-                continue 
+            if includeCoverImage_note is True:
+                try:
+                    cover_image_url = str(categoriesObject[indexCategory][indexBook]['cover_image_url'])
+                    yamlData.append("Cover Image URL: " + str(cover_image_url) + "\n")
+                    yamlData.append("---" + "\n")
+                    titleBlock.append("---" + "\n\n")
+                    titleBlock.append("![](" + cover_image_url + ")" + "\n\n")
+                    titleBlock.append("---" + "\n")
+                except NameError:
+                    continue
+            else:
+                yamlData.append("---" + "\n")
+                titleBlock.append("---" + "\n\n")
+            # Add "last updated" for the note (if exists) otherwise continue
+            if includeDateAsComment_note is True:
+                # Add comment with tags
+                commentBlock.append("%%\n")
+                commentBlock.append("Last Updated: [[" + str(lastUpdated) + "]]")
+                commentBlock.append("\n%%" + "\n")
             fileName = slugify(title)
             # fileName = get_valid_filename_django(title)
             yamlData = "".join(yamlData)
             titleBlock = "".join(titleBlock)
+            commentBlock = "".join(commentBlock)
             # Ignore books with no highlights
             if str(num_highlights) == '0':
                 booksWithNoHighlights += 1
                 pass
             else:
+                if splitCategoriesIntoFolders is True:
+                    # Change directory according to source
+                    newPath = os.path.join(targetDirectory, source.capitalize())
+                    try:
+                        if not os.path.exists(newPath):
+                            os.makedirs(newPath)
+                    except OSError as e:
+                        if e.errno != errno.EEXIST:
+                            raise 
+                    os.chdir(newPath)
+                    # Path(newPath).mkdir(parents=True, exist_ok=True)
+                    """
+                    if str(source) == 'tweets':
+                        sourceOutputDir = 'Tweets'
+                    if str(source) == 'articles':
+                        sourceOutputDir = 'Articles'
+                    if str(source) == 'books':
+                        sourceOutputDir = 'Books'
+                    if str(source) == 'podcasts':
+                        sourceOutputDir = 'Podcasts'
+                    if str(source) == 'supplementals':
+                        sourceOutputDir = 'Supplementals'
+                    """
+                    
                 with open(fileName + ".md", 'w') as newFile: # Warning: this will overwrite all content within the readwise note. 
                     print(yamlData, file=newFile)
+                    if str(commentBlock) != "":
+                        print(commentBlock, file=newFile)
                     print(titleBlock, file=newFile)
                     # Append highlights to the file beneath the 'book_id' metadata
                     for n in range(len(categoriesObject[indexCategory][indexBook]['highlights'])): 
@@ -980,10 +1050,11 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
                                 textNew = []
                                 textSplit = text.split("\n") # type(highlight['text']) = 'list'
                                 for s in range(len(textSplit)):
+                                    # x = ("> " + textSplit[s])
                                     if textSplit[s] == '':
                                         x = ("> \\" + textSplit[s])
                                     else:
-                                        x = ("> " + textSplit[s])    
+                                        x = ("> " + textSplit[s])
                                     textNew.append(x)
                                 textNew = "\n".join(textNew)
                                 highlightData.append(textNew + "\n\n" + "^" + id + "\n\n")
@@ -1003,27 +1074,27 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
                         else:
                             url = str(categoriesObject[indexCategory][indexBook]['highlights'][n]['url'])
                             highlightData.append("**References:** " + str(url) + "\n")
-                        if source == "podcasts" and str(url) != "None":
-                            # Append 'embed/' after the 'airr.io/' string and before the '/quote/' string
-                            airrQuoteMatchingPattern = 'airr.io/'
-                            airrQuoteEmbedText = 'embed/'
-                            if any(airrQuoteMatchingPattern in url for string in url): # Check if url is an AirrQuote
-                                i = url.find(airrQuoteMatchingPattern) # Find index of matching pattern
-                                podcastUrl = url[:i + len(airrQuoteMatchingPattern)] + airrQuoteEmbedText + url[i + len(airrQuoteMatchingPattern):]
+                        if includeiFrameForPodcast_highlight is True:
+                            if source == "podcasts" and str(url) != "None":
+                                # Append 'embed/' after the 'airr.io/' string and before the '/quote/' string
+                                airrQuoteMatchingPattern = 'airr.io/'
+                                airrQuoteEmbedText = 'embed/'
+                                if any(airrQuoteMatchingPattern in url for string in url): # Check if url is an AirrQuote
+                                    i = url.find(airrQuoteMatchingPattern) # Find index of matching pattern
+                                    podcastUrl = url[:i + len(airrQuoteMatchingPattern)] + airrQuoteEmbedText + url[i + len(airrQuoteMatchingPattern):]
+                                else:
+                                    podcastUrl = url
+                                iFrameWithPodcastUrl = '<iframe src="' + podcastUrl + '" frameborder="0" style="width:100%; height:100%;"></iframe>'
+                                highlightData.append(iFrameWithPodcastUrl + "\n")
+                        if includeDateAsComment_highlight is True:
+                            highlighted_at = datetime.strptime(categoriesObject[indexCategory][indexBook]['highlights'][n]['highlighted_at'][0:10], '%Y-%m-%d').strftime(dateFormat) # Trim the UTC date field and re-format
+                            updated = datetime.strptime(categoriesObject[indexCategory][indexBook]['highlights'][n]['updated'][0:10], '%Y-%m-%d').strftime(dateFormat) # Trim the UTC date field and re-format
+                            if highlighted_at == updated:
+                                date = updated
+                                highlightData.append("\n" + "%% " + "Last Updated: " + "[[" + str(date) + "]]" + " %%" + "\n")
                             else:
-                                podcastUrl = url
-                            iFrameWithPodcastUrl = '<iframe src="' + podcastUrl + '" frameborder="0" style="width:100%; height:100%;"></iframe>'
-                            highlightData.append(iFrameWithPodcastUrl + "\n")
-                        """
-                        highlighted_at = datetime.strptime(categoriesObject[indexCategory][indexBook]['highlights'][n]['highlighted_at'][0:10], '%Y-%m-%d').strftime("%y%m%d %A") # Trim the UTC date field and re-format
-                        updated = datetime.strptime(categoriesObject[indexCategory][indexBook]['highlights'][n]['updated'][0:10], '%Y-%m-%d').strftime("%y%m%d %A") # Trim the UTC date field and re-format
-                        if highlighted_at == updated:
-                            date = updated
-                            highlightData.append("**Date:** " + "[[" + str(date) + "]]" + "\n")
-                        else:
-                            date = highlighted_at
-                            highlightData.append("**Date:** " + "[[" + str(date) + "]]" + "\n")
-                        """
+                                date = highlighted_at
+                                highlightData.append("\n" + "%% " + "Last Updated: " + "[[" + str(date) + "]]" + " %%" + "\n")
                         highlightData.append("\n" + "---" + "\n")
                         highlightData = "".join(highlightData)
                         print(highlightData, file=newFile)
@@ -1060,7 +1131,9 @@ def numberOfMarkdownNotes():
 
 # Import all variables from readwiseMetadata file
 print('Importing variables from readwiseMetadata...')
-from readwiseMetadata import token, targetDirectory, dateFrom, email, pwd, chromedriverDirectory, highlightLimitToFetchTags
+from readwiseMetadata import token, targetDirectory, dateFrom, dateFormat, splitCategoriesIntoFolders, \
+includeCoverImage_note, includeDateAsComment_note, includeDateAsComment_highlight, includeiFrameForPodcast_highlight, \
+email, pwd, chromedriverDirectory
 # from readwiseMetadata import *
 
 # Check dateFrom variable
@@ -1084,7 +1157,13 @@ print(str(sourceDirectory) + ' directory variable defined')
 fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, email)
 fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, pwd)
 fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, chromedriverDirectory)
-fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, highlightLimitToFetchTags)
+
+dateFormat = metadataDateFormatCheck(dateFormat, "%Y-%m-%d")
+splitCategoriesIntoFolders = metadataBooleanCheck(splitCategoriesIntoFolders, False)
+includeCoverImage_note = metadataBooleanCheck(includeCoverImage_note, True)
+includeDateAsComment_note = metadataBooleanCheck(includeDateAsComment_note, True)
+includeDateAsComment_highlight = metadataBooleanCheck(includeDateAsComment_highlight, False)
+includeiFrameForPodcast_highlight = metadataBooleanCheck(includeiFrameForPodcast_highlight, True)
 
 ######################################
 ### Load book data from JSON files ###
@@ -1299,12 +1378,12 @@ appendUpdatedHighlightsToObject()
 
 # appendTagsToHighlightObject(highlightsListResultsSort)
 
-# If num of highlights in 'highlightsListResultsSort' is greater than limit specified in 'highlightLimitToFetchTags', fetch tags via CSV export
+# If num of highlights in 'highlightsListResultsSort' is greater than 10, fetch tags via CSV export
 # Otherwise web scrape tags individually via Selenium
 def fetchTagsIndividuallyOrInBulk():
     if fetchTagsBoolean is True:
         try:
-            if len(allHighlightsToFetchTagsFor) > highlightLimitToFetchTags:
+            if len(allHighlightsToFetchTagsFor) > 10:
                 message = 'Fetching tags for ' + str(len(allHighlightsToFetchTagsFor)) + ' highlights in bulk via CSV export...'
                 logDateTimeOutput(message)
                 print(message)
@@ -1320,7 +1399,7 @@ def fetchTagsIndividuallyOrInBulk():
                     list_Location, list_HighlightedAt, list_ReadwiseBookId, list_Source, list_Url, list_NumberOfHighlights, list_UpdatedAt, list_HighlightId, \
                     list_extractedHighlightTags, list_extractedHighlightText, list_extractedHighlightId, list_extractedHighlightLocation, list_extractedHighlightedAt, \
                     list_extractedHighlightBookId, list_noMatchingHighlightIdFromText, list_duplicateHighlightTextValues)
-            elif len(allHighlightsToFetchTagsFor) <= highlightLimitToFetchTags:
+            elif len(allHighlightsToFetchTagsFor) <= 10:
                 message = 'Fetching tags for ' + str(len(allHighlightsToFetchTagsFor)) + ' highlights individually...'
                 logDateTimeOutput(message)
                 print(message)
