@@ -969,7 +969,7 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
                 yamlData.append("---" + "\n")
                 titleBlock.append("---" + "\n\n")
             # Add "last updated" for the note (if exists) otherwise continue
-            if includeDateAsComment_note is True:
+            if includeLastUpdated_note is True:
                 # Add comment with tags
                 commentBlock.append("%%\n")
                 commentBlock.append("Last Updated: [[" + str(lastUpdated) + "]]")
@@ -1086,7 +1086,7 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
                                     podcastUrl = url
                                 iFrameWithPodcastUrl = '<iframe src="' + podcastUrl + '" frameborder="0" style="width:100%; height:100%;"></iframe>'
                                 highlightData.append(iFrameWithPodcastUrl + "\n")
-                        if includeDateAsComment_highlight is True:
+                        if includeLastUpdated_highlight is True:
                             highlighted_at = datetime.strptime(categoriesObject[indexCategory][indexBook]['highlights'][n]['highlighted_at'][0:10], '%Y-%m-%d').strftime(dateFormat) # Trim the UTC date field and re-format
                             updated = datetime.strptime(categoriesObject[indexCategory][indexBook]['highlights'][n]['updated'][0:10], '%Y-%m-%d').strftime(dateFormat) # Trim the UTC date field and re-format
                             if highlighted_at == updated:
@@ -1132,7 +1132,7 @@ def numberOfMarkdownNotes():
 # Import all variables from readwiseMetadata file
 print('Importing variables from readwiseMetadata...')
 from readwiseMetadata import token, targetDirectory, dateFrom, dateFormat, splitCategoriesIntoFolders, \
-includeCoverImage_note, includeDateAsComment_note, includeDateAsComment_highlight, includeiFrameForPodcast_highlight, \
+includeCoverImage_note, includeLastUpdated_note, includeLastUpdated_highlight, includeiFrameForPodcast_highlight, \
 email, pwd, chromedriverDirectory
 # from readwiseMetadata import *
 
@@ -1161,8 +1161,8 @@ fetchTagsBoolean = fetchTagsTrueOrFalse(fetchTagsBoolean, chromedriverDirectory)
 dateFormat = metadataDateFormatCheck(dateFormat, "%Y-%m-%d")
 splitCategoriesIntoFolders = metadataBooleanCheck(splitCategoriesIntoFolders, False)
 includeCoverImage_note = metadataBooleanCheck(includeCoverImage_note, True)
-includeDateAsComment_note = metadataBooleanCheck(includeDateAsComment_note, True)
-includeDateAsComment_highlight = metadataBooleanCheck(includeDateAsComment_highlight, False)
+includeLastUpdated_note = metadataBooleanCheck(includeLastUpdated_note, True)
+includeLastUpdated_highlight = metadataBooleanCheck(includeLastUpdated_highlight, False)
 includeiFrameForPodcast_highlight = metadataBooleanCheck(includeiFrameForPodcast_highlight, True)
 
 ######################################
