@@ -13,13 +13,26 @@ token = "" # ENTER YOUR TOKEN HERE
 targetDirectory = "" # ENTER VALID DIRECTORY PATH HERE
 # e.g. "/Users/johnsmith/Dropbox/Obsidian/Vault" on Mac or "\\Users\\johnsmith\\Dropbox\\Obsidian\\Vault" on Windows
 
-##################################################
-### Specify query string parameters (optional) ###
-##################################################
+#######################################################
+### Specify custom fields and formatting (optional) ###
+#######################################################
 
-dateFrom = "" # "YYYY-MM-DD" format only. Get highlights AFTER this date only. 
+dateFrom = "" # "%Y-%m-%d" a.k.a "YYYY-MM-DD" format only! Get highlights AFTER this date only. 
 # If set to "" or None, the script will default to 'last successful script run' date from readwiseGET.log (if exists), or it will fetch all readwise resources
 # e.g. "2020-01-01"
+
+dateFormat = "%y%m%d %A" # Default is "%Y-%m-%d" a.k.a "YYYY-MM-DD"
+# This is the date format to display "last updated" fields
+
+splitCategoriesIntoFolders = False # This will split highlights into separate folders according to their source category e.g. book/tweet/article/podcast
+
+includeCoverImage_note = True # This will add a "cover image" (if exists) below the title 
+
+includeDateAsComment_note = True # This will add the note "last updated" field below the title in "%%" block
+
+includeDateAsComment_highlight = False # This will add the highlight "last updated" field below the highlight in "%%" block
+
+includeiFrameForPodcast_highlight = True # This will add an iFrame with the "podcast url" below the highlight
 
 #########################################
 ### Data for fetching tags (optional) ###
@@ -38,7 +51,3 @@ pwd = "" # ENTER YOUR PASSWORD HERE
 chromedriverDirectory = "" # ENTER VALID PATH TO CHROMEDRIVER 
 # e.g. "/Users/johnsmith/Downloads/chromedriver.exe" on Mac or "\\Users\\johnsmith\\Downloads\\chromedriver.exe" on Windows
 # Read more here https://chromedriver.chromium.org/
-
-highlightLimitToFetchTags = 10 # ENTER NUMBER HERE 
-# Specify an integer limit (I recommend 10 for speed) to determine whether to fetch tags individually or in bulk via CSV export
-# If <=10 highlights returned, fetch tags individually. If >10 highlights returned, fetch tags in bulk via a CSV export
