@@ -163,7 +163,10 @@ def extractHighlight(field):
     highlight["comments"] = ""
     highlight["references"] = ""
     highlightKeywords = ["**Note:** ", "**Tags:** ", "**References:** ", "<iframe", "%% "]
+    highlightKeywordsOrder = []
+    highlightKeywordsOrderSorted = []
     highlightKeywordsToSplit = []
+    highlightKeywordsToSplitSorted = []
     listOfHeadings = ['# ', '## ', '### ', '#### ', '##### ', '###### ']
     note = ""
     isHighlightBlockWithMultipleNewLines = True
@@ -179,6 +182,9 @@ def extractHighlight(field):
                 # Check if there are any keywords in the block of text
                 for n in range(len(highlightKeywords)):
                     if highlightKeywords[n] in field:
+                        highlightKeywordsOrder.append(field.find(highlightKeywords[n]))
+                        highlightKeywordsOrderSorted = highlightKeywordsOrder.copy()
+                        highlightKeywordsOrderSorted.sort()
                         highlightKeywordsToSplit.append(highlightKeywords[n])
                 # If no keywords are present in the block of text, then there are multiple "\n\n" in the highlight block
                 if len(highlightKeywordsToSplit) == 0:
@@ -204,12 +210,15 @@ def extractHighlight(field):
                 # e.g. if 'note', 'tags' and 'references' are present (in that order), extract substring between 'note' and 'tags', then 'tags' and 'references', etc.
                 else:
                     # First, extract the "> text\n> " and "^ id" components
-                    startWord = highlightKeywordsToSplit[0] # First matching keyword, e.g. "**Tags:** "
+                    for c in range(len(highlightKeywordsOrderSorted)):
+                        pos = highlightKeywordsOrder.index(highlightKeywordsOrderSorted[c])
+                        highlightKeywordsToSplitSorted.append(highlightKeywordsToSplit[pos])
+                    startWord = highlightKeywordsToSplitSorted[0] # First matching keyword, e.g. "**Tags:** "
                     startIndex = 1 # By default, assume that the keyword is one item after the main block of text
-                    # Find the index where the first matching keywork is returned, e.g. "**Tags:** " at index position 4
+                    # Find the index where the first matching keyword is returned from the list, e.g. "**Tags:** " at index position 4
                     for t in range(len(highlightRawSplit)):
-                        if highlightKeywordsToSplit[0] in str(highlightRawSplit[t]):
-                            startIndex = t
+                        if highlightKeywordsToSplitSorted[0] in str(highlightRawSplit[t]):
+                            startIndex = t                  
                     id = highlightRawSplit[startIndex-1].replace("^", "") # Remove Obsidian block ref quote character
                     highlight["id"] = id # Append highlight id to JSON object
                     text = "\n\n".join(highlightRawSplit[0:startIndex-1])
@@ -229,11 +238,11 @@ def extractHighlight(field):
                     highlight["text"] = text # Append highlight text to JSON object
                     # Now, extract the substrings between keywords in the block of text
                     highlightRawSplit_extra = "\n\n".join(highlightRawSplit[startIndex:])
-                    for w in range(len(highlightKeywordsToSplit)):
-                        startWord = highlightKeywordsToSplit[w]
-                        startIndex = highlightKeywords.index(highlightKeywordsToSplit[w])
+                    for w in range(len(highlightKeywordsToSplitSorted)):
+                        startWord = highlightKeywordsToSplitSorted[w]
+                        startIndex = highlightKeywords.index(highlightKeywordsToSplitSorted[w])
                         try:
-                            endWord = highlightKeywordsToSplit[w+1]
+                            endWord = highlightKeywordsToSplitSorted[w+1]
                             stringBetweenWords = highlightRawSplit_extra[highlightRawSplit_extra.find(startWord)+len(startWord):highlightRawSplit_extra.find(endWord)]
                             stringBetweenWords = stringBetweenWords.rstrip()
                             if startIndex == 0:
@@ -275,6 +284,8 @@ def extractHighlight(field):
                                 pass
                             # If 'comments', append to highlight object
                             elif startIndex == 4:
+                                stringBetweenWords = stringBetweenWords.replace("%%", "")
+                                stringBetweenWords = stringBetweenWords.rstrip()
                                 highlight["comments"] = stringBetweenWords
                         except IndexError:
                             stringBetweenWords = highlightRawSplit_extra.rsplit(startWord, 1)[-1]
@@ -319,6 +330,8 @@ def extractHighlight(field):
                                 pass
                             # If 'comments', append to highlight object
                             elif startIndex == 4:
+                                stringBetweenWords = stringBetweenWords.replace("%%", "")
+                                stringBetweenWords = stringBetweenWords.rstrip()
                                 highlight["comments"] = stringBetweenWords
                     highlights.append(highlight)
             else:
@@ -371,17 +384,20 @@ def extractHighlight(field):
                     highlightRawSplit_extra = highlightRawSplit[1]
                 # Extract highlightKeywordsToSplit from string
                 for n in range(len(highlightKeywords)):
-                    if highlightKeywords[n] in highlightRawSplit_extra:
+                    if highlightKeywords[n] in field:
+                        highlightKeywordsOrder.append(highlightRawSplit_extra.find(highlightKeywords[n]))
+                        highlightKeywordsOrderSorted = highlightKeywordsOrder.copy()
+                        highlightKeywordsOrderSorted.sort()
                         highlightKeywordsToSplit.append(highlightKeywords[n])
                 if len(highlightKeywordsToSplit) == 0:
                     pass
                 else:
                     # Extract strings between keywords, and append to highlights object
-                    for w in range(len(highlightKeywordsToSplit)):
-                        startWord = highlightKeywordsToSplit[w]
-                        startIndex = highlightKeywords.index(highlightKeywordsToSplit[w])
+                    for w in range(len(highlightKeywordsToSplitSorted)):
+                        startWord = highlightKeywordsToSplitSorted[w]
+                        startIndex = highlightKeywords.index(highlightKeywordsToSplitSorted[w])
                         try:
-                            endWord = highlightKeywordsToSplit[w+1]
+                            endWord = highlightKeywordsToSplitSorted[w+1]
                             stringBetweenWords = highlightRawSplit_extra[highlightRawSplit_extra.find(startWord)+len(startWord):highlightRawSplit_extra.find(endWord)]
                             stringBetweenWords = stringBetweenWords.rstrip()
                             if startIndex == 0:
@@ -422,6 +438,8 @@ def extractHighlight(field):
                                 pass
                             elif startIndex == 4:
                                 # If comment, append new key:value to highlights object
+                                stringBetweenWords = stringBetweenWords.replace("%%", "")
+                                stringBetweenWords = stringBetweenWords.rstrip()
                                 highlight["comments"] = stringBetweenWords
                             """
                             else:
@@ -469,6 +487,8 @@ def extractHighlight(field):
                                 pass
                             # If comment, append new key:value to highlights object
                             elif startIndex == 4:
+                                stringBetweenWords = stringBetweenWords.replace("%%", "")
+                                stringBetweenWords = stringBetweenWords.rstrip()
                                 highlight["comments"] = stringBetweenWords
                 highlights.append(highlight)
             except IndexError:
