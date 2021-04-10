@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, SessionNotCreatedException
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
@@ -41,7 +41,7 @@ def logDateTimeOutput(message):
     sys.stdout = old_stdout
     log_file.close()
 
-logDateTimeOutput('Script started')
+logDateTimeOutput("'readwise-GET.py' script started")
 
 ########################
 ### Create functions ###
@@ -61,12 +61,13 @@ def insertPath(directory):
 # Check if a 'dateFrom' variable is defined and formatted correctly
 # If TRUE, convert to UTC format. If FALSE, default to dateLastScriptRun
 def convertDateFromToUtcFormat(dateFrom):
-    if dateFrom == "" or dateFrom is None:
-        lastScriptRunDateMatchingString = ' Script complete'
+    if str(dateFrom) == "" or str(dateFrom) == "None":
+        lastScriptRunDateMatchingString = "'readwise-GET.py' script complete"
         try: 
             for line in reversed(list(open('readwise-directory.log', 'r').readlines())):
                 if lastScriptRunDateMatchingString in line:
                     dateLastScriptRun = str(line.replace(lastScriptRunDateMatchingString, '')).rstrip("\n")
+                    dateLastScriptRun = dateLastScriptRun.rstrip()
                     dateFrom = dateLastScriptRun
                     message = 'Last successful script run = "' + str(dateFrom) + '" used as dateFrom in query string'
                     logDateTimeOutput(message)
@@ -74,7 +75,7 @@ def convertDateFromToUtcFormat(dateFrom):
                     return dateLastScriptRun
         except IOError:
             logDateTimeOutput('Failed to read readwise-directory.log file')
-    elif dateFrom != "" or dateFrom is not None:
+    elif str(dateFrom) != "" or str(dateFrom) != "None":
         try:
             parse(dateFrom, fuzzy = False)
             dateFrom = datetime.strptime(dateFrom, '%Y-%m-%d')
@@ -120,10 +121,12 @@ def loadBookDataFromJsonToObject():
 def appendBookDataToObject():
     newBooksCounter = 0
     updatedBooksCounter = 0
+    duplicatedBooksCounter = 0
     totalNumberOfBooks = len(booksListResultsSort)
     for key, value in booksListResultsGroup: # key = 'category'
         old_newBooksCounter = newBooksCounter
         old_updatedBooksCounter = updatedBooksCounter
+        old_duplicatedBooksCounter = duplicatedBooksCounter
         for data in value: 
             book_id = str(data['id'])
             title = unidecode(data['title'])
@@ -140,11 +143,10 @@ def appendBookDataToObject():
             highlights = []
             values = { "book_id" : book_id, "title" : title, "author" : author, "source" : source, "url" : url, "cover_image_url" : cover_image_url, "source_url" : source_url, "num_highlights" : num_highlights, "updated" : updated, "highlights" : highlights }
             indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
-            if not any(d["book_id"] == book_id for d in categoriesObject[indexCategory]):
-                categoriesObject[indexCategory].append(values)
-                newBooksCounter += 1
-                print(str((newBooksCounter + updatedBooksCounter)) + '/' + str(len(booksListResultsSort)) + ' books added or updated')
-            else:
+            # Check if an existing note - with the same 'title' or even 'source_url' - already exists
+            # If a note already exists - either it has the same 'title', or 'source_url', or both - append new highlights to original book object
+            # If a note does note already exist, create a new book object
+            if any(d["book_id"] == book_id for d in categoriesObject[indexCategory]): # ''book_id' already exists i.e. same note with updates
                 indexBook = list(map(itemgetter('book_id'), categoriesObject[indexCategory])).index(book_id)
                 categoriesObject[indexCategory][indexBook]['book_id'] = book_id
                 categoriesObject[indexCategory][indexBook]['title'] = title  
@@ -157,18 +159,106 @@ def appendBookDataToObject():
                 categoriesObject[indexCategory][indexBook]['source_url'] = source_url
                 updatedBooksCounter += 1
                 print(str((newBooksCounter + updatedBooksCounter)) + '/' + str(len(booksListResultsSort)) + ' books added or updated')
+            else: # different 'book_id'
+                try:
+                    if str(source_url).lower() == "none" or str(source_url).lower() == "null" or str(source_url) == "": # 'source_url' is "null" or undefined, try to match by 'title'
+                        """
+                        try:
+                        """
+                        if(any(d["title"] == title for d in categoriesObject[indexCategory]) and any(not d["book_id"] == book_id for d in categoriesObject[indexCategory])): # 'book_id' is different, but 'title' is the same i.e. duplicate note
+                            indexBook = list(map(itemgetter('title'), categoriesObject[indexCategory])).index(str(title))
+                            # categoriesObject[indexCategory][indexBook]['num_highlights'] += num_highlights
+                            # categoriesObject[indexCategory][indexBook]['updated'] = updated
+                            # Append to 'duplicated_by' element if defined, otherwise create and append to book metadata object
+                            try: 
+                                categoriesObject[indexCategory][indexBook]['duplicated_by'].append(book_id)
+                                categoriesObject[indexCategory][indexBook]['duplicated_by'] = list(dict.fromkeys(categoriesObject[indexCategory][indexBook]['duplicated_by']))
+                            except:
+                                duplicated_by = []
+                                duplicated_by.append(book_id) # Append new 'book_id' to original note
+                                categoriesObject[indexCategory][indexBook]['duplicated_by'] = duplicated_by
+                                categoriesObject[indexCategory][indexBook]['duplicated_by'] = list(dict.fromkeys(categoriesObject[indexCategory][indexBook]['duplicated_by']))
+                            duplicatedBooksCounter += 1
+                            listOfDuplicatedBooks.append(str(title))
+                        else: # 'book_id' and 'title' are different i.e. new note
+                            categoriesObject[indexCategory].append(values)
+                            newBooksCounter += 1
+                            print(str((newBooksCounter + updatedBooksCounter)) + '/' + str(len(booksListResultsSort)) + ' books added or updated')
+                        """
+                        except:
+                            pass
+                        """
+                    else: # 'source_url' is defined but not "null"
+                        """
+                        try:
+                        """
+                        if(any(d["source_url"] == source_url for d in categoriesObject[indexCategory]) and any(not d["book_id"] == book_id for d in categoriesObject[indexCategory])): # 'book_id' is different, but source_url' is the same i.e. duplicate note. Assume the 'title' is also the same
+                            indexBook = list(map(itemgetter('source_url'), categoriesObject[indexCategory])).index(str(source_url))
+                            # categoriesObject[indexCategory][indexBook]['num_highlights'] += num_highlights
+                            # categoriesObject[indexCategory][indexBook]['updated'] = updated
+                            # Append to 'duplicated_by' element if defined, otherwise create and append to book metadata object
+                            try: 
+                                categoriesObject[indexCategory][indexBook]['duplicated_by'].append(book_id)
+                                categoriesObject[indexCategory][indexBook]['duplicated_by'] = list(dict.fromkeys(categoriesObject[indexCategory][indexBook]['duplicated_by']))
+                            except: 
+                                duplicated_by = []
+                                duplicated_by.append(book_id) # Append new 'book_id' to original note
+                                categoriesObject[indexCategory][indexBook]['duplicated_by'] = duplicated_by
+                                categoriesObject[indexCategory][indexBook]['duplicated_by'] = list(dict.fromkeys(categoriesObject[indexCategory][indexBook]['duplicated_by']))
+                            duplicatedBooksCounter += 1
+                            listOfDuplicatedBooks.append(str(title))
+                        else: # 'book_id' and 'source_url' are different i.e. new note
+                            categoriesObject[indexCategory].append(values)
+                            newBooksCounter += 1
+                            print(str((newBooksCounter + updatedBooksCounter)) + '/' + str(len(booksListResultsSort)) + ' books added or updated')
+                        """
+                        except:
+                            pass
+                        """
+                except: # 'source_url' is not defined, try to match by 'title'
+                    """
+                    try:
+                    """
+                    if(any(d["title"] == title for d in categoriesObject[indexCategory]) and any(not d["book_id"] == book_id for d in categoriesObject[indexCategory])): # 'book_id' is different, but 'title' is the same i.e. duplicate note
+                        indexBook = list(map(itemgetter('title'), categoriesObject[indexCategory])).index(str(title))
+                        # categoriesObject[indexCategory][indexBook]['num_highlights'] += num_highlights
+                        # categoriesObject[indexCategory][indexBook]['updated'] = updated
+                        # Append to 'duplicated_by' element if defined, otherwise create and append to book metadata object
+                        try: 
+                            categoriesObject[indexCategory][indexBook]['duplicated_by'].append(book_id)
+                            categoriesObject[indexCategory][indexBook]['duplicated_by'] = list(dict.fromkeys(categoriesObject[indexCategory][indexBook]['duplicated_by']))
+                        except:
+                            duplicated_by = []
+                            duplicated_by.append(book_id) # Append new 'book_id' to original note
+                            categoriesObject[indexCategory][indexBook]['duplicated_by'] = duplicated_by
+                            categoriesObject[indexCategory][indexBook]['duplicated_by'] = list(dict.fromkeys(categoriesObject[indexCategory][indexBook]['duplicated_by']))
+                        duplicatedBooksCounter += 1
+                        listOfDuplicatedBooks.append(str(title))
+                    else: # 'book_id' and 'title' are different i.e. new note
+                        categoriesObject[indexCategory].append(values)
+                        newBooksCounter += 1
+                        print(str((newBooksCounter + updatedBooksCounter)) + '/' + str(len(booksListResultsSort)) + ' books added or updated')
+                    """
+                    except:
+                        pass
+                    """
         new_newBooksCounter = newBooksCounter
         new_updatedBooksCounter = updatedBooksCounter
+        new_duplicatedBooksCounter = duplicatedBooksCounter
         message = str(new_newBooksCounter - old_newBooksCounter) + ' new books added and ' + str(new_updatedBooksCounter - old_updatedBooksCounter) + ' updated in ' + str(categoriesObjectNames[indexCategory]) + ' object'
         logDateTimeOutput(message)
+        if (new_duplicatedBooksCounter - old_duplicatedBooksCounter) != 0:
+            message = str(new_duplicatedBooksCounter - old_duplicatedBooksCounter) + ' duplicate books identified in ' + str(categoriesObjectNames[indexCategory]) + ' object'
+            logDateTimeOutput(message)
 
 # Check if 'highlight_id' exists already. If no, append highlight data to the relevant 'book_id' within the category object
 def appendHighlightDataToObject():
     newHighlightsCounter = 0
     updatedHighlightsCounter = 0
+    duplicatedHighlightsCounter = 0
     for key, value in highlightsListResultsGroup: # key = 'book_id'
         listCategories = [item for category in categoriesObject for item in category]
-        if any(d.get('book_id') == str(key) for d in listCategories): # Check if the 'book_id' from the grouped highlights exists. 
+        if any(d.get('book_id') == str(key) for d in listCategories): # Check if the 'book_id' from the grouped highlights exists, if not it might be in the 'duplicated_by' field
             index = list(map(itemgetter('book_id'), listCategories)).index(str(key))
             source = listCategories[index]['source'] # Get the 'category' of the corresponding 'book_id' from the grouped highlights
             indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
@@ -194,6 +284,8 @@ def appendHighlightDataToObject():
                 # highlight = { "id" : id, "text" : text, "note" : note, "tags" : tags, "location" : location, "location_type" : location_type, "url" : url, "highlighted_at" : highlighted_at, "updated" : updated }
                 if not any(d["id"] == id for d in categoriesObject[indexCategory][indexBook]['highlights']):
                     highlight = { "id" : id, "text" : text, "note" : note, "tags" : tags, "location" : location, "location_type" : location_type, "url" : url, "highlighted_at" : highlighted_at, "updated" : updated }
+                    highlight["comments"] = ""
+                    highlight["references"] = ""
                     categoriesObject[indexCategory][indexBook]['highlights'].append(highlight)
                     sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
                     newHighlightsCounter += 1
@@ -203,11 +295,105 @@ def appendHighlightDataToObject():
                     indexHighlight = list(map(itemgetter('id'), categoriesObject[indexCategory][indexBook]['highlights'])).index(id) # Should be the same as 'data'
                     tags = categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags']
                     highlight = { "id" : id, "text" : text, "note" : note, "tags" : tags, "location" : location, "location_type" : location_type, "url" : url, "highlighted_at" : highlighted_at, "updated" : updated }
+                    # Keep the original comments if defined in the JSON
+                    try:
+                        comments = categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['comments']
+                        highlight["comments"] = comments
+                    except:
+                        highlight["comments"] = ""
+                    # Keep the original references if defined in the JSON
+                    try:
+                        references = categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['references']
+                        highlight["references"] = references
+                    except:
+                        highlight["references"] = ""
                     categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight] = highlight
                     sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
                     updatedHighlightsCounter += 1
                     listOfBookIdsToUpdateMarkdownNotes.append([str(key), str(source)])
                     print(str((newHighlightsCounter + updatedHighlightsCounter)) + '/' + str(len(highlightsListResultsSort)) + ' highlights added or updated')
+        else: # 'book_id' not in main JSON object, but perhaps it's in a 'duplicated_by' field
+            try:
+                if any(str(key) in d.get('duplicated_by') for d in listCategories if 'duplicated_by' in d): # 'book_id' found in a 'duplicated_by' field, append highlights to that object instead
+                    try:
+                        for index, val in enumerate(listCategories):
+                            try:
+                                if str(key) in val['duplicated_by']:
+                                    source = listCategories[index]['source'] # Get the 'category' of the corresponding 'book_id' from the grouped highlights
+                                    indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
+                                    originalBookId = listCategories[index]['book_id']
+                                    indexBook = list(map(itemgetter('book_id'), categoriesObject[indexCategory])).index(str(originalBookId)) # Identify which position the original 'book_id' corresponds to within the category object
+                                    for data in value: 
+                                        id = str(data['id'])
+                                        note = unidecode(data['note'])
+                                        location = str(data['location'])
+                                        location_type = data['location_type']
+                                        book_id = str(data['book_id'])
+                                        url = str(data['url'])
+                                        highlighted_at = str(data['highlighted_at'])
+                                        updated = str(data['updated'])
+                                        text = unidecode(data['text'])
+                                        tags = []
+                                        # If the source is a book, add 10 hours to the highlighted at date to account for timezone difference between me and AKST (Amazon's highlighted at timezone)
+                                        # if (str(source) == 'books'):
+                                        #     highlighted_at = str(data['highlighted_at']) # 2021-02-06T04:56:00Z
+                                        #     highlighted_at = datetime.datetime.strptime(highlighted_at, "%Y-%m-%dT%H:%M:%SZ")
+                                        #     highlighted_at = highlighted_at + datetime.timedelta(hours=10)
+                                        #     highlighted_at = highlighted_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+                                        #     print(' appendHighlightDataToObject highlighted_at =', highlighted_at)
+                                        # highlight = { "id" : id, "text" : text, "note" : note, "tags" : tags, "location" : location, "location_type" : location_type, "url" : url, "highlighted_at" : highlighted_at, "updated" : updated }
+                                        if not any(d["id"] == id for d in categoriesObject[indexCategory][indexBook]['highlights']):
+                                            highlight = { "id" : id, "text" : text, "note" : note, "tags" : tags, "location" : location, "location_type" : location_type, "url" : url, "highlighted_at" : highlighted_at, "updated" : updated }
+                                            highlight["comments"] = ""
+                                            highlight["references"] = ""
+                                            categoriesObject[indexCategory][indexBook]['highlights'].append(highlight)
+                                            categoriesObject[indexCategory][indexBook]['num_highlights'] += 1
+                                            categoriesObject[indexCategory][indexBook]['updated'] = str(updated)
+                                            sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
+                                            newHighlightsCounter += 1
+                                            duplicatedHighlightsCounter += 1
+                                            listOfBookIdsToUpdateMarkdownNotes.append([str(originalBookId), str(source)])
+                                            print(str((newHighlightsCounter + updatedHighlightsCounter)) + '/' + str(len(highlightsListResultsSort)) + ' highlights added or updated')
+                                            print(str(duplicatedHighlightsCounter) + '/' + str(len(highlightsListResultsSort)) + ' highlights from duplicate books added or updated to their original books')
+                                        else:
+                                            indexHighlight = list(map(itemgetter('id'), categoriesObject[indexCategory][indexBook]['highlights'])).index(id) # Should be the same as 'data'
+                                            tags = categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags']
+                                            highlight = { "id" : id, "text" : text, "note" : note, "tags" : tags, "location" : location, "location_type" : location_type, "url" : url, "highlighted_at" : highlighted_at, "updated" : updated }
+                                            # Keep the original comments if defined in the JSON
+                                            try:
+                                                comments = categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['comments']
+                                                highlight["comments"] = comments
+                                            except:
+                                                highlight["comments"] = ""
+                                            # Keep the original references if defined in the JSON
+                                            try:
+                                                references = categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['references']
+                                                highlight["references"] = references
+                                            except:
+                                                highlight["references"] = ""
+                                            categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight] = highlight
+                                            sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
+                                            updatedHighlightsCounter += 1
+                                            duplicatedHighlightsCounter += 1
+                                            listOfBookIdsToUpdateMarkdownNotes.append([str(originalBookId), str(source)])
+                                            print(str((newHighlightsCounter + updatedHighlightsCounter)) + '/' + str(len(highlightsListResultsSort)) + ' highlights added or updated')
+                                            print(str(duplicatedHighlightsCounter) + '/' + str(len(highlightsListResultsSort)) + ' highlights from duplicate books added or updated to their original books')
+                            except:
+                                continue # continue looping through items in 'listCategories' until a match is found
+                    except:
+                        pass # once all items have been looped through, exit the loop         
+                """        
+                else:
+                    message = "'book_id' = '" + str(key) + "'' cannot be found"
+                    logDateTimeOutput(message)
+                    print(message)
+                    break
+                """
+            except:
+                message = "'book_id' = '" + str(key) + "'' cannot be found"
+                logDateTimeOutput(message)
+                print(message)
+                pass
     message = str(newHighlightsCounter) + ' new highlights added and ' + str(updatedHighlightsCounter) + ' updated (excl tags)' # '.json'
     logDateTimeOutput(message)
 
@@ -226,7 +412,13 @@ def appendTagsToHighlightObject(list_highlights):
             options.add_argument('--headless')
             options.add_argument('--log-level=3') # to stop logging
             options.add_argument("start-maximized")
-            driver = webdriver.Chrome(chromedriverDirectory, options=options)
+            try: 
+                driver = webdriver.Chrome(
+                    executable_path=chromedriverDirectory,
+                    options=options,
+                )
+            except SessionNotCreatedException as snce:
+                print(snce)
             # driver = webdriver.Chrome(chromedriverDirectory)
             driver.get('https://readwise.io/accounts/login')
             print('Logging into readwise using credentials provided in readwiseMetadata')
@@ -245,57 +437,133 @@ def appendTagsToHighlightObject(list_highlights):
             updatedTagsCounter = 0
             newOrUpdatedTagsProgressCounter = 0
             for i in range(len(list_highlights)): # key = 'book_id'
-                listCategories = [item for category in categoriesObject for item in category]
-                key = str(list_highlights[i]['book_id'])
-                id = str(list_highlights[i]['id'])
-                index = list(map(itemgetter('book_id'), listCategories)).index(key)
-                source = listCategories[index]['source'] # Get the 'category' of the corresponding 'book_id' from the grouped highlights
-                indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
-                indexBook = list(map(itemgetter('book_id'), categoriesObject[indexCategory])).index(str(key)) # Identify which position the 'book_id' corresponds to within the category object
-                bookLastUpdated = categoriesObject[indexCategory][indexBook]['updated']
-                indexHighlight = list(map(itemgetter('id'), categoriesObject[indexCategory][indexBook]['highlights'])).index(id)
-                # highlights = categoriesObject[indexCategory][indexBook]['highlights']
-                book_id = categoriesObject[indexCategory][indexBook]['book_id']
-                bookReviewUrl = 'https://readwise.io/bookreview/' + book_id
-                # Open new tab in Chrome window
-                driver.find_element_by_tag_name('body').send_keys(Keys.COMMAND + 't') 
-                # driver.find_element_by_tag_name('body').send_keys(Keys.CONTROL + 't') 
-                driver.get(bookReviewUrl)
-                # Loop through tags and append to highlight object within corresponding book object
-                try: 
-                    xPathHighlightId = "//*[@id=\'highlight" + id + "\']"
-                    highlightIdBlock = WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.XPATH, xPathHighlightId))
-                    )
-                    tagLinks = highlightIdBlock.find_elements_by_class_name("tag-link") # Get tags within 'highlight id' block
-                    # Load original tags (if they exist)
-                    originalTags = categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags']
-                    originalTags = sorted(originalTags)
-                    originalTagsCounter = len(originalTags)
-                    # Ignore highlights with no tags
-                    if tagLinks == []:
+                try:
+                    listCategories = [item for category in categoriesObject for item in category]
+                    key = str(list_highlights[i]['book_id'])
+                    id = str(list_highlights[i]['id'])
+                    index = list(map(itemgetter('book_id'), listCategories)).index(key)
+                    source = listCategories[index]['source'] # Get the 'category' of the corresponding 'book_id' from the grouped highlights
+                    indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
+                    indexBook = list(map(itemgetter('book_id'), categoriesObject[indexCategory])).index(str(key)) # Identify which position the 'book_id' corresponds to within the category object
+                    bookLastUpdated = categoriesObject[indexCategory][indexBook]['updated']
+                    indexHighlight = list(map(itemgetter('id'), categoriesObject[indexCategory][indexBook]['highlights'])).index(id)
+                    # highlights = categoriesObject[indexCategory][indexBook]['highlights']
+                    book_id = categoriesObject[indexCategory][indexBook]['book_id']
+                    bookReviewUrl = 'https://readwise.io/bookreview/' + book_id
+                    # Open new tab in Chrome window
+                    driver.find_element_by_tag_name('body').send_keys(Keys.COMMAND + 't') 
+                    # driver.find_element_by_tag_name('body').send_keys(Keys.CONTROL + 't') 
+                    driver.get(bookReviewUrl)
+                    # Loop through tags and append to highlight object within corresponding book object
+                    try: 
+                        xPathHighlightId = "//*[@id=\'highlight" + id + "\']"
+                        highlightIdBlock = WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.XPATH, xPathHighlightId))
+                        )
+                        tagLinks = highlightIdBlock.find_elements_by_class_name("tag-link") # Get tags within 'highlight id' block
+                        # Load original tags (if they exist)
+                        originalTags = categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags']
+                        originalTags = sorted(originalTags)
+                        originalTagsCounter = len(originalTags)
+                        # Ignore highlights with no tags
+                        if tagLinks == []:
+                            pass
+                        newTags = []
+                        for tag in tagLinks:
+                            originalHref = tag.get_attribute("href") # e.g. https://readwise.io/tags/<tag_name>
+                            trimHref = originalHref.replace('https://readwise.io/tags/', '') # e.g. <tag_name>
+                            """
+                            if trimHref.startswith('#'):
+                                continue
+                            else:
+                                trimHref = '#' + trimHref
+                            """
+                            newTags.append(trimHref)
+                        newTags = sorted(newTags)
+                        newTagsCounter = len(newTags)
+                        if originalTags == newTags:
+                            pass
+                        else:
+                            categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags'] = newTags
+                            categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['updated'] = bookLastUpdated
+                            updatedTagsCounter += abs((newTagsCounter - originalTagsCounter))
+                            newOrUpdatedTagsProgressCounter += 1
+                            listOfBookIdsToUpdateMarkdownNotes.append([str(key), str(source)])
+                            print(str(newOrUpdatedTagsProgressCounter) + '/' + str(len(list_highlights)) + ' highlights updated with tags')
+                    except:
+                        message = 'Error looping through tags in highlight id block "' + str(id) + '". Book id: "' + str(book_id) + '". Book URL: "' + str(bookReviewUrl) + '". File: "' \
+                        + str(categoriesObjectNames[indexCategory]) + '.json". Book location: "' + str(indexBook) + '". Highlight location: "' + str(indexHighlight) + '".'
+                        logDateTimeOutput(message)
                         pass
-                    newTags = []
-                    for tag in tagLinks:
-                        originalHref = tag.get_attribute("href") # e.g. https://readwise.io/tags/<tag_name>
-                        trimHref = originalHref.replace('https://readwise.io/tags/', '') # e.g. <tag_name>
-                        newTags.append(trimHref)
-                    newTags = sorted(newTags)
-                    newTagsCounter = len(newTags)
-                    if originalTags == newTags:
+                except: # Search for highlight in 'duplicated_by' field
+                    try:
+                        if any(str(key) in d.get('duplicated_by') for d in listCategories if 'duplicated_by' in d): # 'book_id' found in a 'duplicated_by' field, append highlights to that object instead
+                            try:
+                                for index, val in enumerate(listCategories):
+                                    try:
+                                        if str(key) in val['duplicated_by']:
+                                            source = listCategories[index]['source'] # Get the 'category' of the corresponding 'book_id' from the grouped highlights
+                                            indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
+                                            originalBookId = listCategories[index]['book_id']
+                                            indexBook = list(map(itemgetter('book_id'), categoriesObject[indexCategory])).index(str(originalBookId)) # Identify which position the original 'book_id' corresponds to within the category object
+                                            indexHighlight = list(map(itemgetter('id'), categoriesObject[indexCategory][indexBook]['highlights'])).index(id)
+                                            # highlights = categoriesObject[indexCategory][indexBook]['highlights']
+                                            book_id = categoriesObject[indexCategory][indexBook]['book_id']
+                                            bookReviewUrl = 'https://readwise.io/bookreview/' + str(key)
+                                            # Open new tab in Chrome window
+                                            driver.find_element_by_tag_name('body').send_keys(Keys.COMMAND + 't') 
+                                            # driver.find_element_by_tag_name('body').send_keys(Keys.CONTROL + 't') 
+                                            driver.get(bookReviewUrl)
+                                            # Loop through tags and append to highlight object within corresponding book object
+                                            try: 
+                                                xPathHighlightId = "//*[@id=\'highlight" + id + "\']"
+                                                highlightIdBlock = WebDriverWait(driver, 10).until(
+                                                    EC.presence_of_element_located((By.XPATH, xPathHighlightId))
+                                                )
+                                                tagLinks = highlightIdBlock.find_elements_by_class_name("tag-link") # Get tags within 'highlight id' block
+                                                # Load original tags (if they exist)
+                                                originalTags = categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags']
+                                                originalTags = sorted(originalTags)
+                                                originalTagsCounter = len(originalTags)
+                                                # Ignore highlights with no tags
+                                                if tagLinks == []:
+                                                    pass
+                                                newTags = []
+                                                for tag in tagLinks:
+                                                    originalHref = tag.get_attribute("href") # e.g. https://readwise.io/tags/<tag_name>
+                                                    trimHref = originalHref.replace('https://readwise.io/tags/', '') # e.g. <tag_name>
+                                                    """
+                                                    if trimHref.startswith('#'):
+                                                        continue
+                                                    else:
+                                                        trimHref = '#' + trimHref
+                                                    """
+                                                    newTags.append(trimHref)
+                                                newTags = sorted(newTags)
+                                                newTagsCounter = len(newTags)
+                                                if originalTags == newTags:
+                                                    pass
+                                                else:
+                                                    categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags'] = newTags
+                                                    categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['updated'] = bookLastUpdated
+                                                    updatedTagsCounter += abs((newTagsCounter - originalTagsCounter))
+                                                    newOrUpdatedTagsProgressCounter += 1
+                                                    listOfBookIdsToUpdateMarkdownNotes.append([str(originalBookId), str(source)])
+                                                    print(str(newOrUpdatedTagsProgressCounter) + '/' + str(len(list_highlights)) + ' highlights updated with tags')
+                                            except:
+                                                message = 'Error looping through tags in highlight id block "' + str(id) + '". Book id: "' + str(key) + '". Book URL: "' + str(bookReviewUrl) + '". File: "' \
+                                                + str(categoriesObjectNames[indexCategory]) + '.json". Book location: "' + str(indexBook) + '". Highlight location: "' + str(indexHighlight) + '".'
+                                                logDateTimeOutput(message)
+                                                pass
+                                    except:
+                                        continue # continue looping through items in 'listCategories' until a match is found
+                            except:
+                                pass # once all items have been looped through, exit the loop 
+                    except:
+                        message = 'Error looping through tags in highlight id block "' + str(id) + '". Book id: "' + str(book_id) + '". Book URL: "' + str(bookReviewUrl) + '". File: "' \
+                        + str(categoriesObjectNames[indexCategory]) + '.json". Book location: "' + str(indexBook) + '". Highlight location: "' + str(indexHighlight) + '".'
+                        logDateTimeOutput(message)
                         pass
-                    else:
-                        categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags'] = newTags
-                        categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['updated'] = bookLastUpdated
-                        updatedTagsCounter += abs((newTagsCounter - originalTagsCounter))
-                        newOrUpdatedTagsProgressCounter += 1
-                        listOfBookIdsToUpdateMarkdownNotes.append([str(key), str(source)])
-                        print(str(newOrUpdatedTagsProgressCounter) + '/' + str(len(list_highlights)) + ' highlights updated with tags')
-                except: 
-                    message = 'Error looping through tags in highlight id block "' + str(id) + '". Book id: "' + str(book_id) + '". Book URL: "' + str(bookReviewUrl) + '". File: "' \
-                    + str(categoriesObjectNames[indexCategory]) + '.json". Book location: "' + str(indexBook) + '". Highlight location: "' + str(indexHighlight) + '".'
-                    logDateTimeOutput(message)
-                    pass
             driver.quit()
         try:
             message = str(updatedTagsCounter) + ' tags added or updated to ' + str(len(list_highlights)) + ' highlights in ' + str(categoriesObjectNames[indexCategory]) + ' object'
@@ -304,6 +572,7 @@ def appendTagsToHighlightObject(list_highlights):
             message = 'No tags to add or update'
             logDateTimeOutput(message)
 
+# DOUBLE CHECK THIS WORKS
 def appendUpdatedHighlightsToObject():
     listOfBookIdsFromBooksList = []
     listOfBookIdsFromHighlightsList = []
@@ -384,54 +653,145 @@ def appendUpdatedHighlightsToObject():
         missingHighlightsListResultsSort = sorted(missingHighlightsListResults, key = itemgetter('location'))
         newMissingHighlightsCounter = 0
         updatedMissingHighlightsCounter = 0
+        duplicatedMissingHighlightsCounter = 0
         if len(missingHighlightsListResults) == 0:
             break
         else:
             try:
                 for j in range(len(missingHighlightsListResultsSort)):
-                    listCategories = [item for category in categoriesObject for item in category]
-                    book_id = str(missingHighlightsListResultsSort[j]['book_id'])
-                    index = list(map(itemgetter('book_id'), listCategories)).index(book_id)
-                    source = listCategories[index]['source'] # Get the 'category' of the corresponding 'book_id' from the grouped highlights
-                    indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
-                    indexBook = list(map(itemgetter('book_id'), categoriesObject[indexCategory])).index(str(book_id)) # Identify which position the 'book_id' corresponds to within the category object
-                    bookLastUpdated = categoriesObject[indexCategory][indexBook]['updated']
-                    id = str(missingHighlightsListResultsSort[j]['id'])
-                    note = unidecode(missingHighlightsListResultsSort[j]['note'])
-                    location = str(missingHighlightsListResultsSort[j]['location'])
-                    location_type = missingHighlightsListResultsSort[j]['location_type']
-                    url = str(missingHighlightsListResultsSort[j]['url'])
-                    highlighted_at = str(missingHighlightsListResultsSort[j]['highlighted_at'])
-                    updated = str(missingHighlightsListResultsSort[j]['updated'])
-                    text = unidecode(missingHighlightsListResultsSort[j]['text'])
-                    tags = []
-                    highlight = { "id" : id, "text" : text, "note" : note, "tags" : tags, "location" : location, "location_type" : location_type, "url" : url, "highlighted_at" : highlighted_at, "updated" : updated }
-                    if not any(d["id"] == id for d in categoriesObject[indexCategory][indexBook]['highlights']):
-                        categoriesObject[indexCategory][indexBook]['highlights'].append(highlight)
-                        sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
-                        newMissingHighlightsCounter += 1
-                        listOfBookIdsToUpdateMarkdownNotes.append([str(book_id), str(source)])
-                        print(str((newMissingHighlightsCounter + updatedMissingHighlightsCounter)) + '/' + str(len(missingHighlightsListResultsSort)) + ' missing highlights added or updated')
-                    else:
-                        indexHighlight = list(map(itemgetter('id'), categoriesObject[indexCategory][indexBook]['highlights'])).index(id)
-                        if categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['text'] == text:
-                            if categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['note'] == note:
-                                pass
-                            else:
-                                categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['note'] = note
-                                categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['updated'] = bookLastUpdated
+                    try:
+                        listCategories = [item for category in categoriesObject for item in category]
+                        book_id = str(missingHighlightsListResultsSort[j]['book_id'])
+                        index = list(map(itemgetter('book_id'), listCategories)).index(book_id)
+                        source = listCategories[index]['source'] # Get the 'category' of the corresponding 'book_id' from the grouped highlights
+                        indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
+                        indexBook = list(map(itemgetter('book_id'), categoriesObject[indexCategory])).index(str(book_id)) # Identify which position the 'book_id' corresponds to within the category object
+                        bookLastUpdated = categoriesObject[indexCategory][indexBook]['updated']
+                        id = str(missingHighlightsListResultsSort[j]['id'])
+                        note = unidecode(missingHighlightsListResultsSort[j]['note'])
+                        location = str(missingHighlightsListResultsSort[j]['location'])
+                        location_type = missingHighlightsListResultsSort[j]['location_type']
+                        url = str(missingHighlightsListResultsSort[j]['url'])
+                        highlighted_at = str(missingHighlightsListResultsSort[j]['highlighted_at'])
+                        updated = str(missingHighlightsListResultsSort[j]['updated'])
+                        text = unidecode(missingHighlightsListResultsSort[j]['text'])
+                        tags = []
+                        highlight = { "id" : id, "text" : text, "note" : note, "tags" : tags, "location" : location, "location_type" : location_type, "url" : url, "highlighted_at" : highlighted_at, "updated" : updated }
+                        if not any(d["id"] == id for d in categoriesObject[indexCategory][indexBook]['highlights']):
+                            highlight["comments"] = ""
+                            highlight["references"] = ""                        
+                            categoriesObject[indexCategory][indexBook]['highlights'].append(highlight)
+                            sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
+                            newMissingHighlightsCounter += 1
+                            listOfBookIdsToUpdateMarkdownNotes.append([str(book_id), str(source)])
                         else:
-                            categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['text'] = text
-                            categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['updated'] = bookLastUpdated
-                            if categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['note'] == note:
-                                pass
+                            indexHighlight = list(map(itemgetter('id'), categoriesObject[indexCategory][indexBook]['highlights'])).index(id)
+                            if categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['text'] == text: # If 'text' is the same, then check if 'note' is different
+                                if categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['note'] == note: # If 'text' and 'note' are the same, then pass
+                                    pass 
+                                else:
+                                    categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['note'] = note # If 'note' is different, update the 'note' value
+                                    categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['updated'] = bookLastUpdated # If 'note' is different, update the 'updated' value
                             else:
-                                categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['note'] = note
-                        sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
-                        updatedMissingHighlightsCounter += 1
-                        listOfBookIdsToUpdateMarkdownNotes.append([str(book_id), str(source)])
-                    print(str((newMissingHighlightsCounter + updatedMissingHighlightsCounter)) + '/' + str(len(missingHighlightsListResultsSort)) + ' missing highlights added or updated in ' \
-                        + str(categoriesObjectNames[indexCategory]) + ' object')
+                                categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['text'] = text # If 'text' is different, then check if 'note' is different
+                                categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['updated'] = bookLastUpdated
+                                if categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['note'] == note: # If 'note' is the same, then only update 'text' and 'updated' values
+                                    pass
+                                else:
+                                    categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['note'] = note # If 'text' and 'note' are different, update values
+                            sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
+                            updatedMissingHighlightsCounter += 1
+                            listOfBookIdsToUpdateMarkdownNotes.append([str(book_id), str(source)])
+                        print(str((newMissingHighlightsCounter + updatedMissingHighlightsCounter)) + '/' + str(len(missingHighlightsListResultsSort)) + ' missing highlights from ' + str(i+1) + '/' + str(len(listofBookIdsWithMissingHighlights)) + ' books added or updated in ' \
+                            + str(categoriesObjectNames[indexCategory]) + ' object')
+                    except: # if 'book_id' can't be found for highlight, check if it's in a 'duplicated_by' field
+                        try:
+                            listCategories = [item for category in categoriesObject for item in category]
+                            book_id = str(missingHighlightsListResultsSort[j]['book_id'])
+                            if any(str(book_id) in d.get('duplicated_by') for d in listCategories if 'duplicated_by' in d): # 'book_id' found in a 'duplicated_by' field, append highlights to that object instead
+                                try:
+                                    for index, val in enumerate(listCategories):
+                                        try:
+                                            if str(book_id) in val['duplicated_by']:
+                                                source = listCategories[index]['source'] # Get the 'category' of the corresponding 'book_id' from the grouped highlights
+                                                indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
+                                                originalBookId = listCategories[index]['book_id']
+                                                indexBook = list(map(itemgetter('book_id'), categoriesObject[indexCategory])).index(str(originalBookId)) # Identify which position the original 'book_id' corresponds to within the category object
+                                                bookLastUpdated = categoriesObject[indexCategory][indexBook]['updated']
+                                                id = str(missingHighlightsListResultsSort[j]['id'])
+                                                note = unidecode(missingHighlightsListResultsSort[j]['note'])
+                                                location = str(missingHighlightsListResultsSort[j]['location'])
+                                                location_type = missingHighlightsListResultsSort[j]['location_type']
+                                                url = str(missingHighlightsListResultsSort[j]['url'])
+                                                highlighted_at = str(missingHighlightsListResultsSort[j]['highlighted_at'])
+                                                updated = str(missingHighlightsListResultsSort[j]['updated'])
+                                                text = unidecode(missingHighlightsListResultsSort[j]['text'])
+                                                tags = []
+                                                highlight = { "id" : id, "text" : text, "note" : note, "tags" : tags, "location" : location, "location_type" : location_type, "url" : url, "highlighted_at" : highlighted_at, "updated" : updated }
+                                                if not any(d["id"] == id for d in categoriesObject[indexCategory][indexBook]['highlights']):
+                                                    highlight["comments"] = ""
+                                                    highlight["references"] = ""                        
+                                                    categoriesObject[indexCategory][indexBook]['highlights'].append(highlight)
+                                                    categoriesObject[indexCategory][indexBook]['num_highlights'] += 1
+                                                    categoriesObject[indexCategory][indexBook]['updated'] = str(updated)
+                                                    sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
+                                                    newMissingHighlightsCounter += 1
+                                                    duplicatedMissingHighlightsCounter += 1
+                                                    listOfBookIdsToUpdateMarkdownNotes.append([str(originalBookId), str(source)])
+                                                else:
+                                                    indexHighlight = list(map(itemgetter('id'), categoriesObject[indexCategory][indexBook]['highlights'])).index(id)
+                                                    if categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['text'] == text: # If 'text' is the same, then check if 'note' is different
+                                                        if categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['note'] == note: # If 'text' and 'note' are the same, then pass
+                                                            pass 
+                                                        else:
+                                                            categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['note'] = note # If 'note' is different, update the 'note' value
+                                                            categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['updated'] = bookLastUpdated # If 'note' is different, update the 'updated' value
+                                                    else:
+                                                        categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['text'] = text # If 'text' is different, then check if 'note' is different
+                                                        categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['updated'] = bookLastUpdated
+                                                        if categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['note'] == note: # If 'note' is the same, then only update 'text' and 'updated' values
+                                                            pass
+                                                        else:
+                                                            categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['note'] = note # If 'text' and 'note' are different, update values
+                                                    # Keep the original comments if defined in the JSON
+                                                    try:
+                                                        comments = categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['comments']
+                                                        highlight["comments"] = comments
+                                                    except:
+                                                        highlight["comments"] = ""
+                                                    # Keep the original references if defined in the JSON
+                                                    try:
+                                                        references = categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['references']
+                                                        highlight["references"] = references
+                                                    except:
+                                                        highlight["references"] = ""
+                                                    sorted(categoriesObject[indexCategory][indexBook]['highlights'], key = itemgetter('location'))
+                                                    updatedMissingHighlightsCounter += 1
+                                                    duplicatedMissingHighlightsCounter += 1
+                                                    listOfBookIdsToUpdateMarkdownNotes.append([str(originalBookId), str(source)])
+                                                print(str((newMissingHighlightsCounter + updatedMissingHighlightsCounter)) + '/' + str(len(missingHighlightsListResultsSort)) + ' missing highlights from ' + str(i+1) + '/' + str(len(listofBookIdsWithMissingHighlights)) + ' books added or updated in ' \
+                                                    + str(categoriesObjectNames[indexCategory]) + ' object')
+                                                if duplicatedMissingHighlightsCounter == 0:
+                                                    continue
+                                                else:
+                                                    print(str(duplicatedMissingHighlightsCounter) + '/' + str(len(missingHighlightsListResultsSort)) + ' highlights from ' + str(i+1) + '/' + str(len(listofBookIdsWithMissingHighlights)) + ' duplicate books added or updated in ' \
+                                                        + str(categoriesObjectNames[indexCategory]) + ' original object') 
+                                        except:
+                                            continue # continue looping through items in 'listCategories' until a match is found
+                                except:
+                                    pass # once all items have been looped through, exit the loop              
+                            else:
+                                message = "'book_id' = '" + str(key) + "'' cannot be found"
+                                logDateTimeOutput(message)
+                                print(message)
+                                break
+                        except:
+                            """
+                            message = "'book_id' = '" + str(key) + "'' cannot be found"
+                            logDateTimeOutput(message)
+                            print(message)
+                            """
+                            pass
             except ValueError:
                 pass
     try:
@@ -439,7 +799,6 @@ def appendUpdatedHighlightsToObject():
         logDateTimeOutput(message)
         appendHighlightsToListForFetchingTags(missingHighlightsListToFetchTagsFor, missingHighlightsListResultsSort)
         appendHighlightsToListForFetchingTags(allHighlightsToFetchTagsFor, missingHighlightsListResultsSort)
-        # appendTagsToHighlightObject(missingHighlightsListResultsSort)
     except UnboundLocalError:
         message = 'No missing highlights (incl tags) to update'
         logDateTimeOutput(message)
@@ -601,10 +960,13 @@ def downloadCsvExport(latestDownloadedFileName): # with_ublock=False, chromedriv
         "excludeSwitches": ["enable-automation"], # prevent Cloudflare from detecting ChromeDriver as bot
         "useAutomationExtension": False,
         })
-        driver = webdriver.Chrome(
-            executable_path=chromedriverDirectory,
-            options=options,
-        )
+        try:
+            driver = webdriver.Chrome(
+                executable_path=chromedriverDirectory,
+                options=options,
+            )
+        except SessionNotCreatedException as snce:
+            print(snce)
         driver.command_executor._commands["send_command"] = ("POST", '/session/$sessionId/chromium/send_command')
         params = {'behavior': 'allow', 'downloadPath': sourceDirectory}
         driver.execute_cdp_cmd('Page.setDownloadBehavior', params)
@@ -741,6 +1103,8 @@ def checkForDuplicates(listToGetRangeFrom, listToCheckDuplicateValues):
         if listToCheckDuplicateValues.count(listToCheckDuplicateValues[i]) > 1:
             list_duplicateHighlightTextValues[i] = 'Duplicate value'
 
+# FIX FOR DUPLICATED BY FIELD
+
 # Fetch highlight id, book id, and tags from 'highlight text' or 'highlighted at' (if there are duplicates)
 def fetchTagsFromCsvData(list_Highlight, list_BookTitle, list_BookAuthor, list_AmazonBookId, list_Note, list_Color, list_Tags, list_LocationType, list_Location, list_HighlightedAt, \
     list_ReadwiseBookId, list_Source, list_Url, list_NumberOfHighlights, list_UpdatedAt, list_HighlightId, list_extractedHighlightTags, list_extractedHighlightText, list_extractedHighlightId, \
@@ -798,27 +1162,64 @@ def appendTagsFromCsvToCategoriesObject(list_highlights, list_ExtractedTags):
     tagsFromCsvCounter = 0
     totalNumberOfTags = sum(1 for x in list_ExtractedTags if x != '')
     for i in range(len(list_highlights)): # key = 'book_id'
-        listCategories = [item for category in categoriesObject for item in category]
-        key = str(list_highlights[i]['book_id'])
-        id = str(list_highlights[i]['id'])
-        index = list(map(itemgetter('book_id'), listCategories)).index(key)
-        source = listCategories[index]['source'] # Get the 'category' of the corresponding 'book_id' from the grouped highlights
-        indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
-        indexBook = list(map(itemgetter('book_id'), categoriesObject[indexCategory])).index(str(key)) # Identify which position the 'book_id' corresponds to within the category object
-        bookLastUpdated = categoriesObject[indexCategory][indexBook]['updated']
-        indexHighlight = list(map(itemgetter('id'), categoriesObject[indexCategory][indexBook]['highlights'])).index(id)
-        # highlights = categoriesObject[indexCategory][indexBook]['highlights']
-        book_id = categoriesObject[indexCategory][indexBook]['book_id']
-        bookReviewUrl = 'https://readwise.io/bookreview/' + book_id
-        indexTags = list_extractedHighlightId.index(id)
-        if str(list_ExtractedTags[indexTags]) == '' or str(list_ExtractedTags[indexTags]) == 'nan':
-            categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags'] = []
-        else:
-            tagsArray = str(list_ExtractedTags[indexTags]).split()
-            categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags'] = tagsArray
-            categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['updated'] = bookLastUpdated
-            tagsFromCsvCounter += 1
-            print(str(tagsFromCsvCounter) + '/' + str(totalNumberOfTags) + ' tags added or updated from the CSV export')
+        try:
+            listCategories = [item for category in categoriesObject for item in category]
+            key = str(list_highlights[i]['book_id'])
+            id = str(list_highlights[i]['id'])
+            index = list(map(itemgetter('book_id'), listCategories)).index(key)
+            source = listCategories[index]['source'] # Get the 'category' of the corresponding 'book_id' from the grouped highlights
+            indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
+            indexBook = list(map(itemgetter('book_id'), categoriesObject[indexCategory])).index(str(key)) # Identify which position the 'book_id' corresponds to within the category object
+            bookLastUpdated = categoriesObject[indexCategory][indexBook]['updated']
+            indexHighlight = list(map(itemgetter('id'), categoriesObject[indexCategory][indexBook]['highlights'])).index(id)
+            # highlights = categoriesObject[indexCategory][indexBook]['highlights']
+            book_id = categoriesObject[indexCategory][indexBook]['book_id']
+            bookReviewUrl = 'https://readwise.io/bookreview/' + book_id
+            indexTags = list_extractedHighlightId.index(id)
+            if str(list_ExtractedTags[indexTags]) == '' or str(list_ExtractedTags[indexTags]) == 'nan':
+                categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags'] = []
+            else:
+                tagsArray = str(list_ExtractedTags[indexTags]).split()
+                categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags'] = tagsArray
+                categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['updated'] = bookLastUpdated
+                tagsFromCsvCounter += 1
+                print(str(tagsFromCsvCounter) + '/' + str(totalNumberOfTags) + ' tags added or updated from the CSV export')
+        except:
+            try:
+                listCategories = [item for category in categoriesObject for item in category]
+                key = str(list_highlights[i]['book_id'])
+                id = str(list_highlights[i]['id'])
+                if any(str(key) in d.get('duplicated_by') for d in listCategories if 'duplicated_by' in d): # 'book_id' found in a 'duplicated_by' field, append highlights to that object instead
+                    try:
+                        for index, val in enumerate(listCategories):
+                            try:
+                                if str(key) in val['duplicated_by']:
+                                    source = listCategories[index]['source'] # Get the 'category' of the corresponding 'book_id' from the grouped highlights
+                                    indexCategory = categoriesObjectNames.index(source) # Identify which position the 'category' corresponds to within the list of category objects
+                                    originalBookId = listCategories[index]['book_id']
+                                    indexBook = list(map(itemgetter('book_id'), categoriesObject[indexCategory])).index(str(originalBookId)) # Identify which position the original 'book_id' corresponds to within the category object
+                                    bookLastUpdated = categoriesObject[indexCategory][indexBook]['updated']
+                                    indexHighlight = list(map(itemgetter('id'), categoriesObject[indexCategory][indexBook]['highlights'])).index(id)
+                                    # highlights = categoriesObject[indexCategory][indexBook]['highlights']
+                                    book_id = categoriesObject[indexCategory][indexBook]['book_id']
+                                    bookReviewUrl = 'https://readwise.io/bookreview/' + str(key)
+                                    indexTags = list_extractedHighlightId.index(id)
+                                    if str(list_ExtractedTags[indexTags]) == '' or str(list_ExtractedTags[indexTags]) == 'nan':
+                                        categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags'] = []
+                                    else:
+                                        tagsArray = str(list_ExtractedTags[indexTags]).split()
+                                        categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['tags'] = tagsArray
+                                        categoriesObject[indexCategory][indexBook]['highlights'][indexHighlight]['updated'] = bookLastUpdated
+                                        tagsFromCsvCounter += 1
+                                        print(str(tagsFromCsvCounter) + '/' + str(totalNumberOfTags) + ' tags added or updated from the CSV export')
+                            except:
+                                continue # continue looping through items in 'listCategories' until a match is found
+                    except:
+                        pass # once all items have been looped through, exit the loop 
+            except:
+                message = 'Error matching tags for highlights from duplicate books. Please check the \'appendTagsFromCsvToCategoriesObject\' function in the script'
+                logDateTimeOutput(message)
+                pass
     message = str(tagsFromCsvCounter) + '/' + str(totalNumberOfTags) + ' tags added or updated from the CSV export'
     logDateTimeOutput(message)
 
@@ -993,21 +1394,7 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
                     except OSError as e:
                         if e.errno != errno.EEXIST:
                             raise 
-                    os.chdir(newPath)
-                    # Path(newPath).mkdir(parents=True, exist_ok=True)
-                    """
-                    if str(source) == 'tweets':
-                        sourceOutputDir = 'Tweets'
-                    if str(source) == 'articles':
-                        sourceOutputDir = 'Articles'
-                    if str(source) == 'books':
-                        sourceOutputDir = 'Books'
-                    if str(source) == 'podcasts':
-                        sourceOutputDir = 'Podcasts'
-                    if str(source) == 'supplementals':
-                        sourceOutputDir = 'Supplementals'
-                    """
-                    
+                    os.chdir(newPath)                    
                 with open(fileName + ".md", 'w') as newFile: # Warning: this will overwrite all content within the readwise note. 
                     print(yamlData, file=newFile)
                     if str(commentBlock) != "":
@@ -1024,6 +1411,12 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
                         text = unidecode(categoriesObject[indexCategory][indexBook]['highlights'][n]['text'])
                         if "__" in text:
                             text = text.replace("__", "==")
+                        # Replace carriage returns with newline character
+                        if "\r" in text:
+                            text = text.replace("\r", "\n")
+                        # Replace tabs with spaces
+                        if "\t" in text:
+                            text = text.replace("\t", " ")                        
                         # Add # for h1-h5 headings
                         listOfHeadings = ['#h1', '#h2', '#h3', '#h4', '#h5']
                         if any(item in tagsArray for item in listOfHeadings):
@@ -1070,10 +1463,24 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
                             tags = " ".join(str(v) for v in tagsArray)
                             highlightData.append("**Tags:** " + str(tags) + "\n")                    
                         if str(categoriesObject[indexCategory][indexBook]['highlights'][n]['url']) == "None":
-                            pass
+                            try:
+                                if str(categoriesObject[indexCategory][indexBook]['highlights'][n]['references']) == "":
+                                    pass
+                                else:
+                                    references = str(categoriesObject[indexCategory][indexBook]['highlights'][n]['references'])
+                                    highlightData.append("**References:** " + str(references) + "\n")
+                            except:
+                                pass
                         else:
                             url = str(categoriesObject[indexCategory][indexBook]['highlights'][n]['url'])
-                            highlightData.append("**References:** " + str(url) + "\n")
+                            try:
+                                if str(categoriesObject[indexCategory][indexBook]['highlights'][n]['references']) == "":
+                                    highlightData.append("**References:** " + str(url) + "\n")
+                                else:
+                                    references = str(categoriesObject[indexCategory][indexBook]['highlights'][n]['references'])
+                                    highlightData.append("**References:** " + str(url) + " " + str(references) + "\n")
+                            except:
+                                pass
                         if includeiFrameForPodcast_highlight is True:
                             if source == "podcasts" and str(url) != "None":
                                 # Append 'embed/' after the 'airr.io/' string and before the '/quote/' string
@@ -1095,6 +1502,15 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
                             else:
                                 date = highlighted_at
                                 highlightData.append("\n" + "%% " + "Last Updated: " + "[[" + str(date) + "]]" + " %%" + "\n")
+                        # If 'comments' are included in the JSON, append these below the highlight block
+                        try:
+                            if str(categoriesObject[indexCategory][indexBook]['highlights'][n]['comments']) == "":
+                                pass
+                            else:
+                                comments = str(categoriesObject[indexCategory][indexBook]['highlights'][n]['comments'])
+                                highlightData.append("\n" + "%% " + str(comments) + " %%" + "\n")
+                        except:
+                            pass
                         highlightData.append("\n" + "---" + "\n")
                         highlightData = "".join(highlightData)
                         print(highlightData, file=newFile)
@@ -1113,6 +1529,8 @@ def createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes):
     # message = str(len(listOfBookIdsToUpdateMarkdownNotes)) + ' new markdown notes created'
     logDateTimeOutput(message)
     print(message)
+
+# v2.0 - if note with the same 'title', but different 'book_id', change the title somehow. also, check if this impacts readwise-PUT.py script (it shouldn't as that uses title from YAML data)
 
 ##########################################################
 ### Calculate the number of new markdown notes created ###
@@ -1264,6 +1682,8 @@ booksListResultsSort = sorted(booksListResults, key = itemgetter('category')) # 
 print('Grouping readwise book data by category...')
 booksListResultsGroup = groupby(booksListResultsSort, key = itemgetter('category'))
 
+listOfDuplicatedBooks = [] # Append duplicated book titles to list ready to print at the end of the script
+
 # Append new books to categoriesObject, or update existing book data
 print('Appending readwise book data returned to categoriesObject...')
 appendBookDataToObject()
@@ -1376,8 +1796,6 @@ appendUpdatedHighlightsToObject()
 ### Fetch tags individually or in bulk via CSV export ###
 #########################################################
 
-# appendTagsToHighlightObject(highlightsListResultsSort)
-
 # If num of highlights in 'highlightsListResultsSort' is greater than 10, fetch tags via CSV export
 # Otherwise web scrape tags individually via Selenium
 def fetchTagsIndividuallyOrInBulk():
@@ -1436,12 +1854,20 @@ print('Creating or updating markdown notes...')
 
 createMarkdownNote(listOfBookIdsToUpdateMarkdownNotes)
 
+# if duplicate books found, print their titles to the console
+if len(listOfDuplicatedBooks) != 0:
+    print("Duplicated books:")
+    for d in range(len(listOfDuplicatedBooks)):
+        print(' - "' + str(listOfDuplicatedBooks[d]) + '"')
+
 ###############################################
 ### Print script completion time to console ###
 ###############################################
 
 os.chdir(sourceDirectory)
 
-message = 'Script complete'
+message = "'readwise-GET.py' script complete"
 logDateTimeOutput(message)
 print(message)
+time.sleep(3) # Time to check the outputs of the script
+sys.exit()
