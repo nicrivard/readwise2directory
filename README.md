@@ -1,5 +1,5 @@
 [![release](https://img.shields.io/badge/release-v2.0-blue.svg)](https://github.com/nicrivard/readwise2directory/releases/tag/v2.0)
-![downloads](https://img.shields.io/badge/downloads-11-green.svg)
+![downloads](https://img.shields.io/badge/downloads-21-green.svg)
 
 # Description
 
@@ -35,6 +35,8 @@ I'm a huge fan of [Readwise](https://readwise.io/) and [Obsidian](https://obsidi
 		- References (e.g. original URL) 
 - Store book and highlight data into JSON files for easy retrieval and manipulation
 - Print outputs to the console and store in a log file for troubleshooting
+- **NEW** Edit highlights in Readwise directly from a directory (e.g. Obsidian vault)
+[Click here](https://github.com/nicrivard/readwise2directory/blob/master/Assets/readwise-PUT-demo.mp4?raw=true) to download a video demo, or [see a GIF here](Assets/readwise-PUT-demo%20(2).gif)! 
 
 # Screenshots
 
@@ -49,6 +51,9 @@ I'm a huge fan of [Readwise](https://readwise.io/) and [Obsidian](https://obsidi
 
 ##### Markdown note with headings (h1-h5) from Readwise
 ![](Assets/readwise-python_3.png)
+
+##### Edit highlights in Readwise directly from a directory (NEW with [release v2.1](https://github.com/nicrivard/readwise2directory/releases/tag/v2.1))
+![](Assets/readwise-python_7.png)
 
 ##### Graph view of results
 ![](Assets/readwise-python_4.png)
