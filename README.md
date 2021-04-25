@@ -1,5 +1,5 @@
 [![release](https://img.shields.io/badge/release-v2.0-blue.svg)](https://github.com/nicrivard/readwise2directory/releases/tag/v2.0)
-![downloads](https://img.shields.io/badge/downloads-21-green.svg)
+![downloads](https://img.shields.io/badge/downloads-31-green.svg)
 
 # Description
 
